@@ -257,16 +257,31 @@ class TrainingController extends ChangeNotifier {
         setEntries: setEntries,
       ),
     );
-    _state = _state.copyWith(
-      formError: result.isSuccess ? null : RecordFormError.saveFailed,
-      clearFormError: result.isSuccess,
-      clearRecordingPlannedExercise: result.isSuccess,
-      recordSaved: false,
-    );
     if (result.isSuccess) {
-      _refreshSelectedPlannedExercise();
+      final next = _activeRoutinePlan()?.nextPlannedExerciseAfterSaved(
+        saved: planned,
+        completedIds: <PlannedExerciseId>{
+          ..._state.completedPlannedExerciseIds,
+          planned.id,
+        },
+      );
+      _state = _state.copyWith(
+        clearFormError: true,
+        selectedPlannedExercise: next,
+        recordingPlannedExercise: next,
+        clearRecordingPlannedExercise: next == null,
+        recordForm: next == null
+            ? _state.recordForm
+            : RecordFormState(setEntries: next.defaultSetForms()),
+        recordSaved: next != null,
+      );
+      notifyListeners();
       return;
     }
+    _state = _state.copyWith(
+      formError: RecordFormError.saveFailed,
+      recordSaved: false,
+    );
     notifyListeners();
   }
 
@@ -858,6 +873,28 @@ extension WeeklyPlanSelection on WeeklyPlan {
         (days.isEmpty || days.first.exercises.isEmpty
             ? null
             : days.first.exercises.first);
+  }
+
+  PlannedExercise? nextPlannedExerciseAfterSaved({
+    required PlannedExercise saved,
+    required Set<PlannedExerciseId> completedIds,
+  }) {
+    final day = days.firstWhereOrNull(
+      (day) => day.exercises.any((exercise) => exercise.id == saved.id),
+    );
+    if (day == null) {
+      return null;
+    }
+    final savedIndex = day.exercises.indexWhere(
+      (exercise) => exercise.id == saved.id,
+    );
+    for (var index = savedIndex + 1; index < day.exercises.length; index++) {
+      final candidate = day.exercises[index];
+      if (!completedIds.contains(candidate.id)) {
+        return candidate;
+      }
+    }
+    return null;
   }
 }
 

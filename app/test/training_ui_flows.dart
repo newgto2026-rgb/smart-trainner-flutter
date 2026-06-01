@@ -126,6 +126,15 @@ void runTrainingUiFlowTests() {
       '90',
     );
     await _tapKey(tester, 'training_save_record');
+    expect(find.byKey(const Key('training_record_dialog')), findsOneWidget);
+    expect(find.text('머신 체스트 프레스 기록'), findsOneWidget);
+    expect(
+      find.byKey(const Key('training_record_saved_message')),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.byTooltip('닫기'));
+    await tester.pumpAndSettle();
     expect(find.byKey(const Key('training_record_dialog')), findsNothing);
 
     await _tapKey(tester, 'training_tab_home');
