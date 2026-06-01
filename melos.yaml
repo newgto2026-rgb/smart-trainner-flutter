@@ -1,0 +1,29 @@
+name: smart_trainner_flutter
+
+packages:
+  - app
+  - core/**
+  - feature/**
+
+command:
+  bootstrap:
+    usePubspecOverrides: true
+
+scripts:
+  analyze:
+    run: dart run melos exec -- "dart analyze ."
+    description: Run Dart analyzer in every package.
+  test:
+    run: >
+      dart run melos exec --fail-fast --concurrency=1 --
+      "if grep -q 'sdk: flutter' pubspec.yaml; then if [ -d test ]; then flutter test; else echo 'No tests in package'; fi; elif [ -d test ]; then dart test; else echo 'No tests in package'; fi"
+    description: Run unit and widget tests.
+  format:
+    run: dart run melos exec -- "dart format --set-exit-if-changed ."
+    description: Check Dart formatting.
+  build:android:
+    run: dart run melos exec --scope="smart_trainner_flutter" -- "flutter build apk --debug"
+    description: Build the debug Android APK.
+  final-gate:
+    run: dart run melos run analyze && dart run melos run test && dart run melos run build:android
+    description: Run analyzer, tests, and app build.

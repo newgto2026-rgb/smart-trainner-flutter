@@ -1,0 +1,8 @@
+name: smart_trainner_flutter_workspace
+publish_to: none
+
+environment:
+  sdk: ^3.9.0
+
+dev_dependencies:
+  melos: ^6.3.3

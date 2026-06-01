@@ -1,0 +1,38 @@
+name: smart_trainner_flutter
+description: Flutter app shell for Smart Trainner.
+publish_to: none
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.9.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  smart_trainner_core_data:
+    path: ../core/data
+  smart_trainner_core_database:
+    path: ../core/database
+  smart_trainner_core_datastore:
+    path: ../core/datastore
+  smart_trainner_core_designsystem:
+    path: ../core/designsystem
+  smart_trainner_core_domain:
+    path: ../core/domain
+  smart_trainner_feature_training_api:
+    path: ../feature/training/api
+  smart_trainner_feature_training_entry:
+    path: ../feature/training/entry
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  integration_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/brand/
+    - assets/exercises/

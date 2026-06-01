@@ -1,0 +1,26 @@
+name: smart_trainner_feature_training_entry
+publish_to: none
+
+environment:
+  sdk: ^3.9.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  smart_trainner_core_data:
+    path: ../../../core/data
+  smart_trainner_core_database:
+    path: ../../../core/database
+  smart_trainner_core_datastore:
+    path: ../../../core/datastore
+  smart_trainner_core_domain:
+    path: ../../../core/domain
+  smart_trainner_feature_training_api:
+    path: ../api
+  smart_trainner_feature_training_impl:
+    path: ../impl
+
+dev_dependencies:
+  flutter_lints: ^5.0.0
+  flutter_test:
+    sdk: flutter

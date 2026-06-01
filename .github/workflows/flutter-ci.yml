@@ -1,0 +1,62 @@
+name: Flutter CI
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+      - codex/**
+      - feature/**
+      - chore/**
+      - fix/**
+  pull_request:
+    branches:
+      - "**"
+  workflow_dispatch:
+
+concurrency:
+  group: flutter-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-test-lint:
+    name: Build, Unit Test, Analyze
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Bootstrap Melos
+        run: |
+          dart pub get
+          dart run melos bootstrap
+
+      - name: Run analyzer
+        run: dart run melos run analyze
+
+      - name: Run tests
+        run: dart run melos run test
+
+      - name: Build debug APK
+        run: dart run melos run build:android
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: flutter-test-reports
+          path: |
+            **/coverage/**
+            **/build/reports/**
+          if-no-files-found: warn
