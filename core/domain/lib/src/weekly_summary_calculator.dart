@@ -60,7 +60,12 @@ class WeeklySummaryCalculator {
         .longestCurrentStreak(weekStartDate.add(const Duration(days: 6)));
     final rate = plannedCount == 0 ? 0 : completedCount * 100 ~/ plannedCount;
     final weakestMuscle = MuscleGroup.values
-        .where((muscle) => muscle != MuscleGroup.cardio)
+        .where(
+          (muscle) =>
+              muscle != MuscleGroup.cardio &&
+              muscle != MuscleGroup.arms &&
+              muscle != MuscleGroup.fullBody,
+        )
         .fold<MuscleGroup?>(null, (weakest, muscle) {
           if (weakest == null) {
             return muscle;

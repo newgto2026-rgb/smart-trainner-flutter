@@ -4,7 +4,7 @@ import 'package:smart_trainner_core_model/smart_trainner_core_model.dart';
 class ObserveExercisesUseCase {
   const ObserveExercisesUseCase(this.repository);
 
-  final TrainingRepository repository;
+  final ExerciseRepository repository;
 
   Stream<List<Exercise>> call() => repository.observeExercises();
 }
@@ -30,11 +30,19 @@ class ObserveCurrentWeeklyPlanUseCase {
 class ObserveWorkoutLogsUseCase {
   const ObserveWorkoutLogsUseCase(this.repository);
 
-  final TrainingRepository repository;
+  final WorkoutLogRepository repository;
 
   Stream<List<WorkoutLog>> call(DateTime weekStartDate) {
     return repository.observeWorkoutLogs(weekStartDate);
   }
+}
+
+class ObserveLatestWorkoutLogsUseCase {
+  const ObserveLatestWorkoutLogsUseCase(this.repository);
+
+  final WorkoutLogRepository repository;
+
+  Stream<List<WorkoutLog>> call() => repository.observeLatestWorkoutLogs();
 }
 
 class ObserveWeeklySummaryUseCase {

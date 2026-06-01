@@ -17,13 +17,21 @@ class OperationResult<T> {
   bool get isSuccess => error == null;
 }
 
-abstract interface class TrainingRepository {
+abstract interface class WorkoutLogRepository {
+  Stream<List<WorkoutLog>> observeWorkoutLogs(DateTime weekStartDate);
+  Stream<List<WorkoutLog>> observeLatestWorkoutLogs();
+}
+
+abstract interface class ExerciseRepository {
   Stream<List<Exercise>> observeExercises();
+  Future<Exercise?> getExercise(ExerciseId id);
+}
+
+abstract interface class TrainingRepository
+    implements WorkoutLogRepository, ExerciseRepository {
   Stream<List<PlanTemplate>> observePlanTemplates();
   Stream<WeeklyPlan> observeCurrentWeeklyPlan(DateTime weekStartDate);
-  Stream<List<WorkoutLog>> observeWorkoutLogs(DateTime weekStartDate);
   Stream<WeeklySummary> observeWeeklySummary(DateTime weekStartDate);
-  Future<Exercise?> getExercise(ExerciseId id);
   Future<OperationResult<void>> selectPlanTemplate(String templateId);
   Future<OperationResult<void>> saveWorkoutLog(WorkoutLogInput input);
 }

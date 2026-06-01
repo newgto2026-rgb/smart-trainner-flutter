@@ -1,17 +1,17 @@
-import 'dart:async';
-
 import 'package:smart_trainner_core_data/src/seed_training_content.dart';
 import 'package:smart_trainner_core_data/src/training_mappers.dart';
 import 'package:smart_trainner_core_database/smart_trainner_core_database.dart';
 import 'package:smart_trainner_core_datastore/smart_trainner_core_datastore.dart';
 import 'package:smart_trainner_core_domain/smart_trainner_core_domain.dart';
 import 'package:smart_trainner_core_model/smart_trainner_core_model.dart';
+import 'package:rxdart/rxdart.dart';
 
 class DefaultTrainingRepository implements TrainingRepository {
   DefaultTrainingRepository({
     required this.workoutLogDao,
     required this.preferences,
     required this.summaryCalculator,
+    this.customRoutineDao,
   }) : _exerciseById = {
          for (final exercise in SeedTrainingContent.exercises)
            exercise.id: exercise,
@@ -21,6 +21,7 @@ class DefaultTrainingRepository implements TrainingRepository {
   final WorkoutLogDao workoutLogDao;
   final TrainingPreferencesDataSource preferences;
   final WeeklySummaryCalculator summaryCalculator;
+  final CustomRoutineDao? customRoutineDao;
   final Map<ExerciseId, Exercise> _exerciseById;
   final List<PlanTemplate> _templates;
 
@@ -31,38 +32,64 @@ class DefaultTrainingRepository implements TrainingRepository {
 
   @override
   Stream<List<PlanTemplate>> observePlanTemplates() {
-    return Stream.value(_templates);
+    final customRoutineDao = this.customRoutineDao;
+    if (customRoutineDao == null) {
+      return Stream.value(_templates);
+    }
+    return _activeSessionIds().switchMap((sessionId) {
+      return customRoutineDao.observeForSession(sessionId).map((routines) {
+        return <PlanTemplate>[
+          ..._templates,
+          ...routines.map((routine) => routine.toPlanTemplate()),
+        ];
+      });
+    });
   }
 
   @override
   Stream<WeeklyPlan> observeCurrentWeeklyPlan(DateTime weekStartDate) {
-    final sessionId = preferences.activeSessionIdValue ?? defaultUserSessionId;
-    return preferences.selectedTemplateId(sessionId).map((templateId) {
-      return _buildWeeklyPlan(
-        template: _templates.firstWhere(
-          (template) => template.id == templateId,
-          orElse: () => _templates.first,
-        ),
-        weekStartDate: weekStartDate,
-      );
+    return _activeSessionIds().switchMap((sessionId) {
+      return preferences.selectedTemplateId(sessionId).map((templateId) {
+        return _buildWeeklyPlan(
+          template: _templates.firstWhere(
+            (template) => template.id == templateId,
+            orElse: () => _templates.first,
+          ),
+          weekStartDate: weekStartDate,
+        );
+      });
     });
   }
 
   @override
   Stream<List<WorkoutLog>> observeWorkoutLogs(DateTime weekStartDate) {
-    final sessionId = preferences.activeSessionIdValue ?? defaultUserSessionId;
-    return workoutLogDao
-        .observeBetween(
-          sessionId: sessionId,
-          startDate: weekStartDate.dateKey,
-          endDate: weekStartDate.add(const Duration(days: 6)).dateKey,
-        )
-        .map((entities) => entities.map((entity) => entity.toModel()).toList());
+    return _activeSessionIds().switchMap((sessionId) {
+      return workoutLogDao
+          .observeBetween(
+            sessionId: sessionId,
+            startDate: weekStartDate.dateKey,
+            endDate: weekStartDate.add(const Duration(days: 6)).dateKey,
+          )
+          .map(
+            (entities) => entities.map((entity) => entity.toModel()).toList(),
+          );
+    });
+  }
+
+  @override
+  Stream<List<WorkoutLog>> observeLatestWorkoutLogs() {
+    return _activeSessionIds().switchMap((sessionId) {
+      return workoutLogDao
+          .observeAll(sessionId: sessionId)
+          .map(
+            (entities) => entities.map((entity) => entity.toModel()).toList(),
+          );
+    });
   }
 
   @override
   Stream<WeeklySummary> observeWeeklySummary(DateTime weekStartDate) {
-    return combineLatest2(
+    return Rx.combineLatest2(
       observeCurrentWeeklyPlan(weekStartDate),
       observeWorkoutLogs(weekStartDate),
       (plan, logs) => summaryCalculator.calculate(
@@ -149,6 +176,12 @@ class DefaultTrainingRepository implements TrainingRepository {
   String _activeSessionId() =>
       preferences.activeSessionIdValue ?? defaultUserSessionId;
 
+  Stream<String> _activeSessionIds() {
+    return preferences.activeSessionId
+        .map((id) => id ?? defaultUserSessionId)
+        .distinct();
+  }
+
   WeeklyPlan _buildWeeklyPlan({
     required PlanTemplate template,
     required DateTime weekStartDate,
@@ -165,10 +198,20 @@ class DefaultTrainingRepository implements TrainingRepository {
           date: date,
           title: day.title,
           focus: day.focus,
-          exercises: day.exercises.map((item) {
+          exercises: day.exercises.indexed.map((entry) {
+            final slotIndex = entry.$1;
+            final item = entry.$2;
             final exercise = _exerciseById[item.exerciseId]!;
             return PlannedExercise(
-              id: PlannedExerciseId('${date.dateKey}_${item.exerciseId.value}'),
+              id: PlannedExerciseId(
+                _plannedExerciseId(
+                  template: template,
+                  date: date,
+                  dayNumber: day.dayNumber,
+                  slotIndex: slotIndex,
+                  exerciseId: item.exerciseId,
+                ),
+              ),
               exercise: exercise,
               sets: item.sets,
               repRange: item.repRange,
@@ -177,48 +220,25 @@ class DefaultTrainingRepository implements TrainingRepository {
               note: item.note,
             );
           }).toList(),
+          dayNumber: day.dayNumber,
+          primaryFocus: day.primaryFocus,
+          secondaryFocuses: day.secondaryFocuses,
+          minRecoveryHours: day.minRecoveryHours,
         );
       }).toList(),
     );
   }
 }
 
-Stream<R> combineLatest2<A, B, R>(
-  Stream<A> first,
-  Stream<B> second,
-  R Function(A first, B second) combine,
-) {
-  late StreamController<R> controller;
-  StreamSubscription<A>? firstSubscription;
-  StreamSubscription<B>? secondSubscription;
-  A? latestFirst;
-  B? latestSecond;
-  var hasFirst = false;
-  var hasSecond = false;
-
-  void emitIfReady() {
-    if (hasFirst && hasSecond) {
-      controller.add(combine(latestFirst as A, latestSecond as B));
-    }
+String _plannedExerciseId({
+  required PlanTemplate template,
+  required DateTime date,
+  required int dayNumber,
+  required int slotIndex,
+  required ExerciseId exerciseId,
+}) {
+  if (template.source == RoutineSource.custom) {
+    return '${date.dateKey}_${template.id}_day${dayNumber}_slot${slotIndex + 1}_${exerciseId.value}';
   }
-
-  controller = StreamController<R>(
-    onListen: () {
-      firstSubscription = first.listen((value) {
-        latestFirst = value;
-        hasFirst = true;
-        emitIfReady();
-      });
-      secondSubscription = second.listen((value) {
-        latestSecond = value;
-        hasSecond = true;
-        emitIfReady();
-      });
-    },
-    onCancel: () async {
-      await firstSubscription?.cancel();
-      await secondSubscription?.cancel();
-    },
-  );
-  return controller.stream;
+  return '${date.dateKey}_${exerciseId.value}';
 }

@@ -1,0 +1,14 @@
+name: smart_trainner_core_ui
+publish_to: none
+
+environment:
+  sdk: ^3.9.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  smart_trainner_core_designsystem:
+    path: ../designsystem
+
+dev_dependencies:
+  lints: ^5.1.1

@@ -1,0 +1,20 @@
+name: smart_trainner_feature_routine_impl
+publish_to: none
+
+environment:
+  sdk: ^3.9.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  smart_trainner_core_model:
+    path: ../../../core/model
+  smart_trainner_feature_routine_api:
+    path: ../api
+  smart_trainner_feature_routine_domain:
+    path: ../domain
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  lints: ^5.1.1

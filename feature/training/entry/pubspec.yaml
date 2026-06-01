@@ -15,6 +15,10 @@ dependencies:
     path: ../../../core/datastore
   smart_trainner_core_domain:
     path: ../../../core/domain
+  smart_trainner_feature_routine_data:
+    path: ../../routine/data
+  smart_trainner_feature_routine_domain:
+    path: ../../routine/domain
   smart_trainner_feature_training_api:
     path: ../api
   smart_trainner_feature_training_impl:

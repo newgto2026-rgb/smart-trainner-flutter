@@ -7,12 +7,18 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  collection: ^1.19.1
+  flutter_riverpod: ^2.6.1
   smart_trainner_core_designsystem:
     path: ../../../core/designsystem
   smart_trainner_core_domain:
     path: ../../../core/domain
   smart_trainner_core_model:
     path: ../../../core/model
+  smart_trainner_core_ui:
+    path: ../../../core/ui
+  smart_trainner_feature_routine_domain:
+    path: ../../routine/domain
   smart_trainner_feature_training_api:
     path: ../api
 
