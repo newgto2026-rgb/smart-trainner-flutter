@@ -1,4 +1,5 @@
 import 'package:smart_trainner_core_database/smart_trainner_core_database.dart';
+import 'package:smart_trainner_core_data/smart_trainner_core_data.dart';
 import 'package:smart_trainner_core_model/smart_trainner_core_model.dart';
 import 'package:smart_trainner_feature_routine_data/smart_trainner_feature_routine_data.dart';
 import 'package:test/test.dart';

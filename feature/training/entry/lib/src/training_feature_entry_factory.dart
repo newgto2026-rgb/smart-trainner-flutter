@@ -2,16 +2,30 @@ import 'package:smart_trainner_core_data/smart_trainner_core_data.dart';
 import 'package:smart_trainner_core_database/smart_trainner_core_database.dart';
 import 'package:smart_trainner_core_datastore/smart_trainner_core_datastore.dart';
 import 'package:smart_trainner_core_domain/smart_trainner_core_domain.dart';
+import 'package:smart_trainner_feature_routine_data/smart_trainner_feature_routine_data.dart';
+import 'package:smart_trainner_feature_routine_domain/smart_trainner_feature_routine_domain.dart';
 import 'package:smart_trainner_feature_training_api/smart_trainner_feature_training_api.dart';
 import 'package:smart_trainner_feature_training_impl/smart_trainner_feature_training_impl.dart';
 
 TrainingFeatureEntry createTrainingFeatureEntry() {
   final preferences = TrainingPreferencesDataSource();
   final workoutLogDao = InMemoryWorkoutLogDao();
+  final customRoutineDao = InMemoryCustomRoutineDao();
+  final seedStore = TrainingSeedStore(
+    content: const DefaultTrainingSeedContentProvider(),
+  );
   final repository = DefaultTrainingRepository(
     workoutLogDao: workoutLogDao,
     preferences: preferences,
     summaryCalculator: WeeklySummaryCalculator(),
+    customRoutineDao: customRoutineDao,
+  );
+  final activeSessionResolver = ActiveSessionResolver(preferences);
+  final routinePlanRepository = DefaultRoutinePlanRepository(
+    customRoutineDao: customRoutineDao,
+    preferences: preferences,
+    activeSessionResolver: activeSessionResolver,
+    seedStore: seedStore,
   );
 
   return TrainingFeatureEntryImpl(
@@ -22,5 +36,9 @@ TrainingFeatureEntry createTrainingFeatureEntry() {
     observeWeeklySummary: ObserveWeeklySummaryUseCase(repository),
     selectPlanTemplate: SelectPlanTemplateUseCase(repository),
     saveWorkoutLog: SaveWorkoutLogUseCase(repository),
+    saveCustomRoutine: SaveCustomRoutineUseCase(
+      routinePlanRepository,
+      const ValidateCustomRoutineUseCase(),
+    ),
   );
 }

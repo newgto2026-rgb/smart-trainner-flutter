@@ -3,7 +3,7 @@ import 'package:smart_trainner_feature_analysis_domain/smart_trainner_feature_an
 import 'package:test/test.dart';
 
 void main() {
-  const calculator = WeeklySummaryCalculator();
+  final calculator = WeeklySummaryCalculator();
   final weekStart = DateTime(2026, 5, 18);
 
   test('calculate counts completion volume and muscle balance', () {

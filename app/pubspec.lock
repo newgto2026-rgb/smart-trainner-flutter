@@ -372,6 +372,13 @@ packages:
       relative: true
     source: path
     version: "0.0.0"
+  smart_trainner_feature_routine_data:
+    dependency: "direct overridden"
+    description:
+      path: "../feature/routine/data"
+      relative: true
+    source: path
+    version: "0.0.0"
   smart_trainner_feature_routine_domain:
     dependency: "direct overridden"
     description:

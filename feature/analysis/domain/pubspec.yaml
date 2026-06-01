@@ -5,6 +5,8 @@ environment:
   sdk: ^3.9.0
 
 dependencies:
+  smart_trainner_core_domain:
+    path: ../../../core/domain
   smart_trainner_core_model:
     path: ../../../core/model
 

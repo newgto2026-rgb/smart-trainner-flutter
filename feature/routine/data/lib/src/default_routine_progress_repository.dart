@@ -1,9 +1,9 @@
 import 'package:rxdart/rxdart.dart';
+import 'package:smart_trainner_core_data/smart_trainner_core_data.dart';
 import 'package:smart_trainner_core_database/smart_trainner_core_database.dart';
 import 'package:smart_trainner_core_datastore/smart_trainner_core_datastore.dart';
 import 'package:smart_trainner_core_domain/smart_trainner_core_domain.dart';
 import 'package:smart_trainner_core_model/smart_trainner_core_model.dart';
-import 'package:smart_trainner_feature_routine_data/src/custom_routine_mappers.dart';
 import 'package:smart_trainner_feature_routine_domain/smart_trainner_feature_routine_domain.dart';
 
 class DefaultRoutineProgressRepository
@@ -22,7 +22,7 @@ class DefaultRoutineProgressRepository
 
   @override
   Stream<RoutineProgress> observeRoutineProgress() {
-    return activeSessionResolver.observeSessionId().asyncExpand((sessionId) {
+    return activeSessionResolver.observeSessionId().switchMap((sessionId) {
       return Rx.combineLatest2(
         preferences.activeRoutineProgress(sessionId),
         customRoutineDao.observeForSession(sessionId),

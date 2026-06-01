@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
 import 'package:smart_trainner_core_domain/smart_trainner_core_domain.dart';
+import 'package:smart_trainner_feature_routine_domain/smart_trainner_feature_routine_domain.dart';
 import 'package:smart_trainner_feature_training_api/smart_trainner_feature_training_api.dart';
 import 'package:smart_trainner_feature_training_impl/src/training_route.dart';
 
@@ -12,6 +13,7 @@ class TrainingFeatureEntryImpl implements TrainingFeatureEntry {
     required this.observeWeeklySummary,
     required this.selectPlanTemplate,
     required this.saveWorkoutLog,
+    required this.saveCustomRoutine,
   });
 
   final ObserveExercisesUseCase observeExercises;
@@ -21,6 +23,7 @@ class TrainingFeatureEntryImpl implements TrainingFeatureEntry {
   final ObserveWeeklySummaryUseCase observeWeeklySummary;
   final SelectPlanTemplateUseCase selectPlanTemplate;
   final SaveWorkoutLogUseCase saveWorkoutLog;
+  final SaveCustomRoutineUseCase saveCustomRoutine;
 
   @override
   Widget build(BuildContext context) {
@@ -32,6 +35,7 @@ class TrainingFeatureEntryImpl implements TrainingFeatureEntry {
       observeWeeklySummary: observeWeeklySummary,
       selectPlanTemplate: selectPlanTemplate,
       saveWorkoutLog: saveWorkoutLog,
+      saveCustomRoutine: saveCustomRoutine,
     );
   }
 }

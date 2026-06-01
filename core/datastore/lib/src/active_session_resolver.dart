@@ -6,7 +6,9 @@ class ActiveSessionResolver {
   final TrainingPreferencesDataSource preferences;
 
   Stream<String> observeSessionId() {
-    return preferences.activeSessionId.map((id) => id ?? defaultUserSessionId);
+    return preferences.activeSessionId
+        .map((id) => id ?? defaultUserSessionId)
+        .distinct();
   }
 
   Future<String> sessionId() async {

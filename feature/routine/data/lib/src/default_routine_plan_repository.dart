@@ -1,3 +1,5 @@
+import 'package:rxdart/rxdart.dart';
+import 'package:smart_trainner_core_data/smart_trainner_core_data.dart';
 import 'package:smart_trainner_core_database/smart_trainner_core_database.dart';
 import 'package:smart_trainner_core_datastore/smart_trainner_core_datastore.dart';
 import 'package:smart_trainner_core_domain/smart_trainner_core_domain.dart';
@@ -23,7 +25,7 @@ class DefaultRoutinePlanRepository
 
   @override
   Stream<List<PlanTemplate>> observePlanTemplates() {
-    return activeSessionResolver.observeSessionId().asyncExpand((sessionId) {
+    return activeSessionResolver.observeSessionId().switchMap((sessionId) {
       return customRoutineDao.observeForSession(sessionId).map((routines) {
         return <PlanTemplate>[
           ...seedStore.templates,

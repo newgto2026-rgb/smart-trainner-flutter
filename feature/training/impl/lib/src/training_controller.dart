@@ -15,14 +15,23 @@ class TrainingController extends ChangeNotifier {
     required ObserveWeeklySummaryUseCase observeWeeklySummary,
     required SelectPlanTemplateUseCase selectPlanTemplate,
     required SaveWorkoutLogUseCase saveWorkoutLog,
+    required SaveCustomRoutineUseCase saveCustomRoutine,
     DateTime? today,
   }) : _selectPlanTemplate = selectPlanTemplate,
        _saveWorkoutLog = saveWorkoutLog,
+       _saveCustomRoutine = saveCustomRoutine,
        _weekStart = _mondayOf(today ?? DateTime.now()) {
     _subscriptions
       ..add(
         observePlanTemplates().listen((templates) {
-          _state = _state.copyWith(templates: templates);
+          _state = _state.copyWith(
+            templates: templates
+                .where((template) => template.source == RoutineSource.system)
+                .toList(),
+            customTemplates: templates
+                .where((template) => template.source == RoutineSource.custom)
+                .toList(),
+          );
           _refreshSelectedPlannedExercise();
         }),
       )
@@ -60,6 +69,7 @@ class TrainingController extends ChangeNotifier {
 
   final SelectPlanTemplateUseCase _selectPlanTemplate;
   final SaveWorkoutLogUseCase _saveWorkoutLog;
+  final SaveCustomRoutineUseCase _saveCustomRoutine;
   final AdvanceRoutineDayUseCase _advanceRoutineDay =
       const AdvanceRoutineDayUseCase();
   final DateTime _weekStart;
@@ -590,10 +600,20 @@ class TrainingController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void saveCustomRoutine() {
+  Future<void> saveCustomRoutine() async {
     final builder = _state.customRoutineBuilder;
-    final template = _customTemplateFromBuilder(builder);
-    if (template == null) {
+    final input = _customRoutineInputFromBuilder(builder);
+    if (input == null) {
+      return;
+    }
+    final result = await _saveCustomRoutine(
+      input: input,
+      availableExerciseIds: _state.exercises
+          .map((exercise) => exercise.id)
+          .toSet(),
+    );
+    final template = result.value;
+    if (!result.isSuccess || template == null) {
       return;
     }
     final customTemplates = <PlanTemplate>[
@@ -608,6 +628,7 @@ class TrainingController extends ChangeNotifier {
           ? template.id
           : _state.activeRoutineTemplateId,
     );
+    _refreshSelectedPlannedExercise(notify: false);
     notifyListeners();
   }
 
@@ -630,10 +651,12 @@ class TrainingController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void _refreshSelectedPlannedExercise() {
-    final plan = _state.plan;
+  void _refreshSelectedPlannedExercise({bool notify = true}) {
+    final plan = _activeRoutinePlan();
     if (plan == null) {
-      notifyListeners();
+      if (notify) {
+        notifyListeners();
+      }
       return;
     }
     final recording = plan.findPlannedExercise(
@@ -645,54 +668,79 @@ class TrainingController extends ChangeNotifier {
       selectedPlannedExercise: selected,
       recordingPlannedExercise: recording,
     );
-    notifyListeners();
+    if (notify) {
+      notifyListeners();
+    }
   }
 
   WorkoutDayPlan? _activeRoutineDayPlan() {
+    final plan = _activeRoutinePlan();
+    if (plan == null) {
+      return null;
+    }
+    final index = _state.activeRoutineDayIndex
+        .clamp(0, plan.days.length - 1)
+        .toInt();
+    return plan.days[index];
+  }
+
+  WeeklyPlan? _activeRoutinePlan() {
     final template = _state.activeRoutineTemplate;
     if (template == null || template.days.isEmpty) {
       return null;
     }
-    final index = _state.activeRoutineDayIndex
-        .clamp(0, template.days.length - 1)
-        .toInt();
     final plan = _state.plan;
-    if (plan?.templateId == template.id && index < (plan?.days.length ?? 0)) {
-      return plan!.days[index];
+    if (plan?.templateId == template.id) {
+      return plan;
     }
-    final day = template.days[index];
-    final date = _weekStart.add(Duration(days: day.dayOffset));
     final exercisesById = <ExerciseId, Exercise>{
       for (final exercise in _state.exercises) exercise.id: exercise,
     };
-    return WorkoutDayPlan(
-      date: date,
-      title: day.title,
-      focus: day.focus,
-      dayNumber: day.dayNumber,
-      primaryFocus: day.primaryFocus,
-      secondaryFocuses: day.secondaryFocuses,
-      minRecoveryHours: day.minRecoveryHours,
-      exercises: day.exercises
-          .map((item) {
-            final exercise = exercisesById[item.exerciseId];
-            if (exercise == null) {
-              return null;
-            }
-            return PlannedExercise(
-              id: PlannedExerciseId(
-                '${template.id}_${day.dayNumber}_${item.exerciseId.value}',
-              ),
-              exercise: exercise,
-              sets: item.sets,
-              repRange: item.repRange,
-              durationMinutes: item.durationMinutes,
-              restSeconds: item.restSeconds,
-              note: item.note,
-            );
-          })
-          .whereType<PlannedExercise>()
-          .toList(),
+    return WeeklyPlan(
+      id: PlanId('${template.id}_${_weekStart.dateKey}'),
+      templateId: template.id,
+      name: template.name,
+      weekStartDate: _weekStart,
+      days: template.days.map((day) {
+        final date = _weekStart.add(Duration(days: day.dayOffset));
+        return WorkoutDayPlan(
+          date: date,
+          title: day.title,
+          focus: day.focus,
+          dayNumber: day.dayNumber,
+          primaryFocus: day.primaryFocus,
+          secondaryFocuses: day.secondaryFocuses,
+          minRecoveryHours: day.minRecoveryHours,
+          exercises: day.exercises.indexed
+              .map((entry) {
+                final slotIndex = entry.$1;
+                final item = entry.$2;
+                final exercise = exercisesById[item.exerciseId];
+                if (exercise == null) {
+                  return null;
+                }
+                return PlannedExercise(
+                  id: PlannedExerciseId(
+                    _plannedExerciseId(
+                      template: template,
+                      date: date,
+                      dayNumber: day.dayNumber,
+                      slotIndex: slotIndex,
+                      exerciseId: item.exerciseId,
+                    ),
+                  ),
+                  exercise: exercise,
+                  sets: item.sets,
+                  repRange: item.repRange,
+                  durationMinutes: item.durationMinutes,
+                  restSeconds: item.restSeconds,
+                  note: item.note,
+                );
+              })
+              .whereType<PlannedExercise>()
+              .toList(),
+        );
+      }).toList(),
     );
   }
 
@@ -736,7 +784,9 @@ class TrainingController extends ChangeNotifier {
     );
   }
 
-  PlanTemplate? _customTemplateFromBuilder(CustomRoutineBuilderState builder) {
+  CustomRoutineInput? _customRoutineInputFromBuilder(
+    CustomRoutineBuilderState builder,
+  ) {
     if (!builder.visible) {
       return null;
     }
@@ -746,19 +796,15 @@ class TrainingController extends ChangeNotifier {
     if (builder.name.trim().isEmpty || validDays.isEmpty) {
       return null;
     }
-    return PlanTemplate(
-      id: builder.editingTemplateId ?? 'custom-test',
+    return CustomRoutineInput(
+      id: builder.editingTemplateId,
       name: builder.name.trim(),
-      level: PlanLevel.intermediate,
-      daysPerWeek: validDays.length,
       description: '사용자가 직접 구성한 루틴',
       days: validDays.indexed.map((entry) {
         final index = entry.$1;
         final day = entry.$2;
         final focus = day.focus;
-        return PlanTemplateDay(
-          dayOffset: index,
-          dayNumber: index + 1,
+        return CustomRoutineDayInput(
           title: 'Day ${index + 1}',
           focus: routineFocusLabel(focus),
           primaryFocus: focus,
@@ -768,10 +814,12 @@ class TrainingController extends ChangeNotifier {
             final exercise = _state.exercises.firstWhereOrNull(
               (exercise) => exercise.id == exerciseId,
             );
-            return TemplateExercise(
+            final repRange = exercise?.defaultRepRange ?? const RepRange(8, 12);
+            return CustomRoutineExerciseInput(
               exerciseId: exerciseId,
               sets: exercise?.defaultSets ?? 3,
-              repRange: exercise?.defaultRepRange ?? const RepRange(8, 12),
+              repRangeStart: repRange.first,
+              repRangeEnd: repRange.last,
               durationMinutes: exercise?.defaultDurationMinutes,
               restSeconds: exercise?.restSeconds ?? 60,
               note: '',
@@ -779,12 +827,6 @@ class TrainingController extends ChangeNotifier {
           }).toList(),
         );
       }).toList(),
-      structure: RoutineStructure.bodyPartSplit,
-      recommendedExperience: TrainingExperience.intermediate,
-      cycleLength: validDays.length,
-      sessionMinutes: 0,
-      focusSummary: validDays.map((day) => day.focus).nonNulls.toList(),
-      source: RoutineSource.custom,
     );
   }
 
@@ -967,4 +1009,26 @@ DateTime _mondayOf(DateTime date) {
   return normalized.subtract(
     Duration(days: normalized.weekday - DateTime.monday),
   );
+}
+
+String _plannedExerciseId({
+  required PlanTemplate template,
+  required DateTime date,
+  required int dayNumber,
+  required int slotIndex,
+  required ExerciseId exerciseId,
+}) {
+  if (template.source == RoutineSource.custom) {
+    return '${date.dateKey}_${template.id}_day${dayNumber}_slot${slotIndex + 1}_${exerciseId.value}';
+  }
+  return '${date.dateKey}_${exerciseId.value}';
+}
+
+extension _TrainingDateKey on DateTime {
+  String get dateKey {
+    final normalized = normalizeDate(this);
+    final month = normalized.month.toString().padLeft(2, '0');
+    final day = normalized.day.toString().padLeft(2, '0');
+    return '${normalized.year}-$month-$day';
+  }
 }

@@ -3,6 +3,7 @@ import 'package:smart_trainner_core_designsystem/smart_trainner_core_designsyste
 import 'package:smart_trainner_core_domain/smart_trainner_core_domain.dart';
 import 'package:smart_trainner_core_model/smart_trainner_core_model.dart';
 import 'package:smart_trainner_core_ui/smart_trainner_core_ui.dart';
+import 'package:smart_trainner_feature_routine_domain/smart_trainner_feature_routine_domain.dart';
 import 'package:smart_trainner_feature_training_impl/src/exercise_step_images.dart';
 import 'package:smart_trainner_feature_training_impl/src/exercise_step_text.dart';
 import 'package:smart_trainner_feature_training_impl/src/training_controller.dart';
@@ -17,6 +18,7 @@ class TrainingRoute extends StatefulWidget {
     required this.observeWeeklySummary,
     required this.selectPlanTemplate,
     required this.saveWorkoutLog,
+    required this.saveCustomRoutine,
     this.today,
     super.key,
   });
@@ -28,6 +30,7 @@ class TrainingRoute extends StatefulWidget {
   final ObserveWeeklySummaryUseCase observeWeeklySummary;
   final SelectPlanTemplateUseCase selectPlanTemplate;
   final SaveWorkoutLogUseCase saveWorkoutLog;
+  final SaveCustomRoutineUseCase saveCustomRoutine;
   final DateTime? today;
 
   @override
@@ -48,6 +51,7 @@ class _TrainingRouteState extends State<TrainingRoute> {
       observeWeeklySummary: widget.observeWeeklySummary,
       selectPlanTemplate: widget.selectPlanTemplate,
       saveWorkoutLog: widget.saveWorkoutLog,
+      saveCustomRoutine: widget.saveCustomRoutine,
       today: widget.today,
     );
   }
@@ -218,17 +222,6 @@ class _HomeTab extends StatelessWidget {
             onStartWorkout: controller.startWorkoutForActiveRoutineDay,
             onCompleteDay: controller.completeRoutineDay,
           ),
-        const SizedBox(height: 20),
-        _SectionTitle(title: '주간 진행'),
-        const SizedBox(height: 12),
-        _ProgressSurface(summary: state.summary),
-        const SizedBox(height: 20),
-        _SectionTitle(title: '최근 기록'),
-        const SizedBox(height: 12),
-        if (state.logs.isEmpty)
-          const _EmptySurface(text: '첫 세트를 저장하면 여기에 기록이 쌓입니다.')
-        else
-          ...state.logs.take(5).map(_RecentLogTile.new),
       ],
     );
   }
@@ -242,7 +235,7 @@ class _PlanTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final plan = state.plan;
+    final plan = _activeRoutinePlan(state);
     final activeTemplate = state.activeRoutineTemplate;
     return SmartTrainnerScreenScaffold(
       chrome: _screenChrome(state),
@@ -357,23 +350,20 @@ class _AnalysisTab extends StatelessWidget {
     final summary = state.summary;
     return SmartTrainnerScreenScaffold(
       chrome: const SmartTrainnerScreenChrome(
-        title: '분석',
-        subtitle: '이번 주 운동 데이터를 요약합니다',
+        title: '트레이닝 분석',
+        subtitle: '이번 주 진행, 부위 균형, 최근 기록',
       ),
       children: <Widget>[
-        _SectionTitle(title: '분석'),
-        const SizedBox(height: 12),
         _SummaryBand(summary: summary),
-        const SizedBox(height: 16),
+        if (state.logs.isNotEmpty) ...<Widget>[
+          const SizedBox(height: 14),
+          _RecentRecordsCard(logs: state.logs, plan: state.plan),
+        ],
+        const SizedBox(height: 14),
         if (summary == null)
           const _EmptySurface(text: '분석을 계산하는 중입니다.')
-        else ...<Widget>[
-          _MetricGrid(summary: summary),
-          const SizedBox(height: 16),
-          _InsightSurface(text: summary.insight),
-          const SizedBox(height: 16),
+        else
           _MuscleBalance(summary: summary),
-        ],
       ],
     );
   }
@@ -3129,46 +3119,6 @@ class _SummaryBand extends StatelessWidget {
   }
 }
 
-class _MetricGrid extends StatelessWidget {
-  const _MetricGrid({required this.summary});
-
-  final WeeklySummary summary;
-
-  @override
-  Widget build(BuildContext context) {
-    return GridView.count(
-      crossAxisCount: 2,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      mainAxisSpacing: 10,
-      crossAxisSpacing: 10,
-      childAspectRatio: 2.4,
-      children: <Widget>[
-        _MetricTile(
-          label: '완료',
-          value: '${summary.completedExerciseCount}개',
-          accent: SmartTrainnerColors.coral,
-        ),
-        _MetricTile(
-          label: '세트',
-          value: '${summary.totalSets}',
-          accent: SmartTrainnerColors.green,
-        ),
-        _MetricTile(
-          label: '볼륨',
-          value: '${summary.totalVolumeKg.toStringAsFixed(0)}kg',
-          accent: SmartTrainnerColors.amber,
-        ),
-        _MetricTile(
-          label: '시간',
-          value: '${summary.totalMinutes}분',
-          accent: SmartTrainnerColors.steel,
-        ),
-      ],
-    );
-  }
-}
-
 class _MetricTile extends StatelessWidget {
   const _MetricTile({
     required this.label,
@@ -3203,6 +3153,98 @@ class _MetricTile extends StatelessWidget {
   }
 }
 
+class _RecentRecordsCard extends StatelessWidget {
+  const _RecentRecordsCard({required this.logs, required this.plan});
+
+  final List<WorkoutLog> logs;
+  final WeeklyPlan? plan;
+
+  @override
+  Widget build(BuildContext context) {
+    final records = logs.take(3).toList();
+    return _Surface(
+      key: const Key('training_recent_records_card'),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: Text(
+                  '최근 기록',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: SmartTrainnerColors.ink,
+                  ),
+                ),
+              ),
+              _Badge(
+                key: const Key('training_recent_records_count'),
+                label: '최근 ${records.length}개',
+                backgroundColor: SmartTrainnerColors.coralSoft,
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          ...records.map((log) {
+            final planned = plan?.findPlannedExercise(log.plannedExerciseId);
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: _RecentRecordItem(log: log, plannedExercise: planned),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+}
+
+class _RecentRecordItem extends StatelessWidget {
+  const _RecentRecordItem({required this.log, required this.plannedExercise});
+
+  final WorkoutLog log;
+  final PlannedExercise? plannedExercise;
+
+  @override
+  Widget build(BuildContext context) {
+    return _Surface(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: Text(
+                  plannedExercise?.exercise.name ?? log.exerciseId.value,
+                  style: const TextStyle(fontWeight: FontWeight.w800),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              _Badge(
+                label: '${log.performedAt.month}월 ${log.performedAt.day}일',
+                backgroundColor: SmartTrainnerColors.steelSoft,
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: <Widget>[
+              _Badge(label: '세트 ${log.sets}개'),
+              if (log.reps != null) _Badge(label: '반복 ${log.reps}회'),
+              if (log.weightKg != null)
+                _Badge(label: '${log.weightKg!.toStringAsFixed(1)}kg'),
+              if (log.durationMinutes != null)
+                _Badge(label: '운동 ${log.durationMinutes}분'),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _MuscleBalance extends StatelessWidget {
   const _MuscleBalance({required this.summary});
 
@@ -3210,117 +3252,71 @@ class _MuscleBalance extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        _SectionTitle(title: '근육 균형'),
-        const SizedBox(height: 8),
-        _Surface(
-          child: Column(
-            children: <Widget>[
-              for (final muscle in MuscleGroup.values)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: Column(
-                    children: <Widget>[
-                      Row(
-                        children: <Widget>[
-                          Expanded(
-                            child: Text(
-                              muscle.displayName,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                          Text(
-                            '${summary.muscleBalance[muscle] ?? 0}개',
-                            style: const TextStyle(
-                              color: SmartTrainnerColors.muted,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      SmartTrainnerProgressBar(
-                        progress:
-                            (summary.muscleBalance[muscle] ?? 0) /
-                            summary.completedExerciseCount.clamp(1, 99),
-                      ),
-                    ],
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ],
+    final maxMuscleBalance = summary.muscleBalance.values.fold<int>(
+      1,
+      (max, value) => value > max ? value : max,
     );
-  }
-}
-
-class _RecentLogTile extends StatelessWidget {
-  const _RecentLogTile(this.log);
-
-  final WorkoutLog log;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: _Surface(
-        child: Row(
-          children: <Widget>[
-            const Icon(Icons.check_circle, color: SmartTrainnerColors.green),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text('${log.sets}세트 저장 · ${log.performedAt.dateLabel}'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ProgressSurface extends StatelessWidget {
-  const _ProgressSurface({required this.summary});
-
-  final WeeklySummary? summary;
-
-  @override
-  Widget build(BuildContext context) {
-    final summary = this.summary;
-    final progress = summary == null ? 0.0 : summary.completionRate / 100;
     return _Surface(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           Text(
-            summary == null ? '완료율 0%' : '완료율 ${summary.completionRate}%',
-            style: const TextStyle(fontWeight: FontWeight.w900),
+            '부위별 완료',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w800,
+              color: SmartTrainnerColors.ink,
+            ),
           ),
-          const SizedBox(height: 10),
-          LinearProgressIndicator(value: progress),
+          const SizedBox(height: 12),
+          if (summary.muscleBalance.isEmpty)
+            const Text(
+              '아직 기록이 없습니다. 오늘 운동을 마치면 바로 변화가 보입니다.',
+              style: TextStyle(color: SmartTrainnerColors.muted),
+            )
+          else ...<Widget>[
+            for (final entry in summary.muscleBalance.entries)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Column(
+                  children: <Widget>[
+                    Row(
+                      children: <Widget>[
+                        Expanded(
+                          child: Text(
+                            entry.key.displayName,
+                            style: const TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                        Text(
+                          '${entry.value}회',
+                          style: const TextStyle(
+                            color: SmartTrainnerColors.muted,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    SmartTrainnerProgressBar(
+                      progress: entry.value / maxMuscleBalance,
+                    ),
+                  ],
+                ),
+              ),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: SmartTrainnerColors.amberSoft,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                summary.insight,
+                style: const TextStyle(color: SmartTrainnerColors.ink),
+              ),
+            ),
+          ],
         ],
       ),
-    );
-  }
-}
-
-class _InsightSurface extends StatelessWidget {
-  const _InsightSurface({required this.text});
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFFF3D8),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Text(text),
     );
   }
 }
@@ -3342,7 +3338,7 @@ class _EmptySurface extends StatelessWidget {
 }
 
 class _Surface extends StatelessWidget {
-  const _Surface({required this.child});
+  const _Surface({required this.child, super.key});
 
   final Widget child;
 
@@ -3427,50 +3423,104 @@ String _formErrorText(RecordFormError error) {
 }
 
 WorkoutDayPlan? _currentRoutineDayPlan(TrainingUiState state) {
+  final plan = _activeRoutinePlan(state);
+  if (plan == null) {
+    return null;
+  }
+  final index = state.activeRoutineDayIndex
+      .clamp(0, plan.days.length - 1)
+      .toInt();
+  return plan.days[index];
+}
+
+WeeklyPlan? _activeRoutinePlan(TrainingUiState state) {
   final template = state.activeRoutineTemplate;
   if (template == null || template.days.isEmpty) {
     return null;
   }
-  final index = state.activeRoutineDayIndex
-      .clamp(0, template.days.length - 1)
-      .toInt();
   final plan = state.plan;
-  if (plan?.templateId == template.id && index < (plan?.days.length ?? 0)) {
-    return plan!.days[index];
+  if (plan?.templateId == template.id) {
+    return plan;
   }
-  final templateDay = template.days[index];
+  final weekStart = plan?.weekStartDate ?? _mondayOf(DateTime.now());
   final exercisesById = <ExerciseId, Exercise>{
     for (final exercise in state.exercises) exercise.id: exercise,
   };
-  return WorkoutDayPlan(
-    date: DateTime.now(),
-    title: templateDay.title,
-    focus: templateDay.focus,
-    dayNumber: templateDay.dayNumber,
-    primaryFocus: templateDay.primaryFocus,
-    secondaryFocuses: templateDay.secondaryFocuses,
-    minRecoveryHours: templateDay.minRecoveryHours,
-    exercises: templateDay.exercises
-        .map((item) {
-          final exercise = exercisesById[item.exerciseId];
-          if (exercise == null) {
-            return null;
-          }
-          return PlannedExercise(
-            id: PlannedExerciseId(
-              '${template.id}_${templateDay.dayNumber}_${item.exerciseId.value}',
-            ),
-            exercise: exercise,
-            sets: item.sets,
-            repRange: item.repRange,
-            durationMinutes: item.durationMinutes,
-            restSeconds: item.restSeconds,
-            note: item.note,
-          );
-        })
-        .whereType<PlannedExercise>()
-        .toList(),
+  return WeeklyPlan(
+    id: PlanId('${template.id}_${weekStart.dateKey}'),
+    templateId: template.id,
+    name: template.name,
+    weekStartDate: weekStart,
+    days: template.days.map((templateDay) {
+      final date = weekStart.add(Duration(days: templateDay.dayOffset));
+      return WorkoutDayPlan(
+        date: date,
+        title: templateDay.title,
+        focus: templateDay.focus,
+        dayNumber: templateDay.dayNumber,
+        primaryFocus: templateDay.primaryFocus,
+        secondaryFocuses: templateDay.secondaryFocuses,
+        minRecoveryHours: templateDay.minRecoveryHours,
+        exercises: templateDay.exercises.indexed
+            .map((entry) {
+              final slotIndex = entry.$1;
+              final item = entry.$2;
+              final exercise = exercisesById[item.exerciseId];
+              if (exercise == null) {
+                return null;
+              }
+              return PlannedExercise(
+                id: PlannedExerciseId(
+                  _plannedExerciseId(
+                    template: template,
+                    date: date,
+                    dayNumber: templateDay.dayNumber,
+                    slotIndex: slotIndex,
+                    exerciseId: item.exerciseId,
+                  ),
+                ),
+                exercise: exercise,
+                sets: item.sets,
+                repRange: item.repRange,
+                durationMinutes: item.durationMinutes,
+                restSeconds: item.restSeconds,
+                note: item.note,
+              );
+            })
+            .whereType<PlannedExercise>()
+            .toList(),
+      );
+    }).toList(),
   );
+}
+
+DateTime _mondayOf(DateTime date) {
+  final normalized = normalizeDate(date);
+  return normalized.subtract(
+    Duration(days: normalized.weekday - DateTime.monday),
+  );
+}
+
+String _plannedExerciseId({
+  required PlanTemplate template,
+  required DateTime date,
+  required int dayNumber,
+  required int slotIndex,
+  required ExerciseId exerciseId,
+}) {
+  if (template.source == RoutineSource.custom) {
+    return '${date.dateKey}_${template.id}_day${dayNumber}_slot${slotIndex + 1}_${exerciseId.value}';
+  }
+  return '${date.dateKey}_${exerciseId.value}';
+}
+
+extension _TrainingRouteDateKey on DateTime {
+  String get dateKey {
+    final normalized = normalizeDate(this);
+    final month = normalized.month.toString().padLeft(2, '0');
+    final day = normalized.day.toString().padLeft(2, '0');
+    return '${normalized.year}-$month-$day';
+  }
 }
 
 const _customFocusOptions = <RoutineFocus>[
@@ -3571,8 +3621,4 @@ extension _ChunkedList<T> on List<T> {
       yield sublist(start, end);
     }
   }
-}
-
-extension on DateTime {
-  String get dateLabel => '$month/$day';
 }

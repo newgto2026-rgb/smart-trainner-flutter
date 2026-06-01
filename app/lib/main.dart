@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:smart_trainner_core_designsystem/smart_trainner_core_designsystem.dart';
@@ -27,19 +29,24 @@ class SmartTrainnerApp extends StatefulWidget {
 class _SmartTrainnerAppState extends State<SmartTrainnerApp> {
   late final trainingFeatureEntry = createTrainingFeatureEntry();
   bool _showSplash = true;
+  Timer? _splashTimer;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      Future<void>.delayed(const Duration(milliseconds: 1650), () {
-        if (mounted) {
-          setState(() {
-            _showSplash = false;
-          });
-        }
-      });
+    _splashTimer = Timer(const Duration(milliseconds: 1650), () {
+      if (mounted) {
+        setState(() {
+          _showSplash = false;
+        });
+      }
     });
+  }
+
+  @override
+  void dispose() {
+    _splashTimer?.cancel();
+    super.dispose();
   }
 
   @override

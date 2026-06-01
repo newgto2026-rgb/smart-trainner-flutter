@@ -27,12 +27,16 @@ void runTrainingUiFlowTests() {
     expect(find.byKey(const Key('training_tab_home')), findsOneWidget);
     expect(find.byKey(const Key('training_tab_analysis')), findsOneWidget);
     expect(find.byKey(const Key('training_tab_record')), findsNothing);
+    expect(find.text('주간 진행'), findsNothing);
+    expect(find.text('최근 기록'), findsNothing);
   });
 
   testWidgets('weekly summary only appears on analysis tab', (tester) async {
     await _pumpApp(tester);
 
     expect(find.byKey(const Key('training_summary_band')), findsNothing);
+    expect(find.text('주간 진행'), findsNothing);
+    expect(find.text('최근 기록'), findsNothing);
 
     await _tapKey(tester, 'training_tab_plan');
     expect(find.byKey(const Key('training_summary_band')), findsNothing);
@@ -42,6 +46,7 @@ void runTrainingUiFlowTests() {
 
     await _tapKey(tester, 'training_tab_analysis');
     expect(find.byKey(const Key('training_summary_band')), findsOneWidget);
+    expect(find.text('이번 주 요약'), findsOneWidget);
   });
 
   testWidgets('exercise detail shows step images', (tester) async {
@@ -122,6 +127,20 @@ void runTrainingUiFlowTests() {
     );
     await _tapKey(tester, 'training_save_record');
     expect(find.byKey(const Key('training_record_dialog')), findsNothing);
+
+    await _tapKey(tester, 'training_tab_home');
+    expect(find.text('최근 기록'), findsNothing);
+
+    await _tapKey(tester, 'training_tab_analysis');
+    expect(
+      find.byKey(const Key('training_recent_records_card')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('training_recent_records_count')),
+      findsOneWidget,
+    );
+    expect(find.text('최근 1개'), findsOneWidget);
   });
 
   testWidgets('exercise method during workout hides start record action', (
@@ -519,15 +538,21 @@ Future<void> _selectCustomFocus(WidgetTester tester, String optionKey) async {
 }
 
 void _expectCustomRoutineFlowDaysVisible() {
-  expect(
-    find.byKey(const Key('training_routine_flow_custom-test')),
-    findsOneWidget,
-  );
+  final customFlow = find.byWidgetPredicate((widget) {
+    final key = widget.key;
+    return key is ValueKey<String> &&
+        key.value.startsWith('training_routine_flow_custom-') &&
+        !key.value.contains('_day_');
+  });
+  expect(customFlow, findsOneWidget);
   for (var dayNumber = 1; dayNumber <= 4; dayNumber++) {
-    expect(
-      find.byKey(Key('training_routine_flow_custom-test_day_$dayNumber')),
-      findsOneWidget,
-    );
+    final customDay = find.byWidgetPredicate((widget) {
+      final key = widget.key;
+      return key is ValueKey<String> &&
+          key.value.startsWith('training_routine_flow_custom-') &&
+          key.value.endsWith('_day_$dayNumber');
+    });
+    expect(customDay, findsOneWidget);
   }
 }
 

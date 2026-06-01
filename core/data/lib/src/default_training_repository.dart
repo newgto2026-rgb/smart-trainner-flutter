@@ -11,6 +11,7 @@ class DefaultTrainingRepository implements TrainingRepository {
     required this.workoutLogDao,
     required this.preferences,
     required this.summaryCalculator,
+    this.customRoutineDao,
   }) : _exerciseById = {
          for (final exercise in SeedTrainingContent.exercises)
            exercise.id: exercise,
@@ -20,6 +21,7 @@ class DefaultTrainingRepository implements TrainingRepository {
   final WorkoutLogDao workoutLogDao;
   final TrainingPreferencesDataSource preferences;
   final WeeklySummaryCalculator summaryCalculator;
+  final CustomRoutineDao? customRoutineDao;
   final Map<ExerciseId, Exercise> _exerciseById;
   final List<PlanTemplate> _templates;
 
@@ -30,41 +32,59 @@ class DefaultTrainingRepository implements TrainingRepository {
 
   @override
   Stream<List<PlanTemplate>> observePlanTemplates() {
-    return Stream.value(_templates);
+    final customRoutineDao = this.customRoutineDao;
+    if (customRoutineDao == null) {
+      return Stream.value(_templates);
+    }
+    return _activeSessionIds().switchMap((sessionId) {
+      return customRoutineDao.observeForSession(sessionId).map((routines) {
+        return <PlanTemplate>[
+          ..._templates,
+          ...routines.map((routine) => routine.toPlanTemplate()),
+        ];
+      });
+    });
   }
 
   @override
   Stream<WeeklyPlan> observeCurrentWeeklyPlan(DateTime weekStartDate) {
-    final sessionId = preferences.activeSessionIdValue ?? defaultUserSessionId;
-    return preferences.selectedTemplateId(sessionId).map((templateId) {
-      return _buildWeeklyPlan(
-        template: _templates.firstWhere(
-          (template) => template.id == templateId,
-          orElse: () => _templates.first,
-        ),
-        weekStartDate: weekStartDate,
-      );
+    return _activeSessionIds().switchMap((sessionId) {
+      return preferences.selectedTemplateId(sessionId).map((templateId) {
+        return _buildWeeklyPlan(
+          template: _templates.firstWhere(
+            (template) => template.id == templateId,
+            orElse: () => _templates.first,
+          ),
+          weekStartDate: weekStartDate,
+        );
+      });
     });
   }
 
   @override
   Stream<List<WorkoutLog>> observeWorkoutLogs(DateTime weekStartDate) {
-    final sessionId = preferences.activeSessionIdValue ?? defaultUserSessionId;
-    return workoutLogDao
-        .observeBetween(
-          sessionId: sessionId,
-          startDate: weekStartDate.dateKey,
-          endDate: weekStartDate.add(const Duration(days: 6)).dateKey,
-        )
-        .map((entities) => entities.map((entity) => entity.toModel()).toList());
+    return _activeSessionIds().switchMap((sessionId) {
+      return workoutLogDao
+          .observeBetween(
+            sessionId: sessionId,
+            startDate: weekStartDate.dateKey,
+            endDate: weekStartDate.add(const Duration(days: 6)).dateKey,
+          )
+          .map(
+            (entities) => entities.map((entity) => entity.toModel()).toList(),
+          );
+    });
   }
 
   @override
   Stream<List<WorkoutLog>> observeLatestWorkoutLogs() {
-    final sessionId = preferences.activeSessionIdValue ?? defaultUserSessionId;
-    return workoutLogDao
-        .observeAll(sessionId: sessionId)
-        .map((entities) => entities.map((entity) => entity.toModel()).toList());
+    return _activeSessionIds().switchMap((sessionId) {
+      return workoutLogDao
+          .observeAll(sessionId: sessionId)
+          .map(
+            (entities) => entities.map((entity) => entity.toModel()).toList(),
+          );
+    });
   }
 
   @override
@@ -156,6 +176,12 @@ class DefaultTrainingRepository implements TrainingRepository {
   String _activeSessionId() =>
       preferences.activeSessionIdValue ?? defaultUserSessionId;
 
+  Stream<String> _activeSessionIds() {
+    return preferences.activeSessionId
+        .map((id) => id ?? defaultUserSessionId)
+        .distinct();
+  }
+
   WeeklyPlan _buildWeeklyPlan({
     required PlanTemplate template,
     required DateTime weekStartDate,
@@ -172,10 +198,20 @@ class DefaultTrainingRepository implements TrainingRepository {
           date: date,
           title: day.title,
           focus: day.focus,
-          exercises: day.exercises.map((item) {
+          exercises: day.exercises.indexed.map((entry) {
+            final slotIndex = entry.$1;
+            final item = entry.$2;
             final exercise = _exerciseById[item.exerciseId]!;
             return PlannedExercise(
-              id: PlannedExerciseId('${date.dateKey}_${item.exerciseId.value}'),
+              id: PlannedExerciseId(
+                _plannedExerciseId(
+                  template: template,
+                  date: date,
+                  dayNumber: day.dayNumber,
+                  slotIndex: slotIndex,
+                  exerciseId: item.exerciseId,
+                ),
+              ),
               exercise: exercise,
               sets: item.sets,
               repRange: item.repRange,
@@ -192,4 +228,17 @@ class DefaultTrainingRepository implements TrainingRepository {
       }).toList(),
     );
   }
+}
+
+String _plannedExerciseId({
+  required PlanTemplate template,
+  required DateTime date,
+  required int dayNumber,
+  required int slotIndex,
+  required ExerciseId exerciseId,
+}) {
+  if (template.source == RoutineSource.custom) {
+    return '${date.dateKey}_${template.id}_day${dayNumber}_slot${slotIndex + 1}_${exerciseId.value}';
+  }
+  return '${date.dateKey}_${exerciseId.value}';
 }

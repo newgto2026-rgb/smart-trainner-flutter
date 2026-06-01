@@ -1,14 +1,6 @@
 name: Flutter CI
 
 on:
-  push:
-    branches:
-      - main
-      - develop
-      - codex/**
-      - feature/**
-      - chore/**
-      - fix/**
   pull_request:
     branches:
       - "**"
