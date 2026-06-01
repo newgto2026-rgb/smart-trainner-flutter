@@ -93,6 +93,9 @@ enum MuscleGroup {
   chest('가슴'),
   shoulders('어깨'),
   arms('팔'),
+  biceps('이두'),
+  triceps('삼두'),
+  forearms('전완근'),
   core('코어'),
   cardio('유산소'),
   fullBody('전신');
@@ -136,6 +139,31 @@ enum PlanLevel {
 
   final String displayName;
 }
+
+enum RoutineStructure { fullBody, balancedSplit, bodyPartSplit }
+
+enum RoutineSource { system, custom }
+
+enum RoutineFocus {
+  fullBody,
+  upperBody,
+  push,
+  pull,
+  chest,
+  back,
+  lowerBody,
+  shoulders,
+  arms,
+  biceps,
+  triceps,
+  forearms,
+  cardioConditioning,
+  core,
+}
+
+enum TrainingExperience { beginner, intermediate }
+
+enum RoutineFeeling { balancedFullBody, focusedBodyPart, appRecommended }
 
 class RepRange {
   const RepRange(this.first, this.last);
@@ -199,7 +227,13 @@ class PlanTemplate {
     required this.daysPerWeek,
     required this.description,
     required this.days,
-  });
+    this.structure = RoutineStructure.fullBody,
+    this.recommendedExperience = TrainingExperience.beginner,
+    int? cycleLength,
+    this.sessionMinutes = 45,
+    this.focusSummary = const <RoutineFocus>[RoutineFocus.fullBody],
+    this.source = RoutineSource.system,
+  }) : _cycleLength = cycleLength;
 
   final String id;
   final String name;
@@ -207,6 +241,14 @@ class PlanTemplate {
   final int daysPerWeek;
   final String description;
   final List<PlanTemplateDay> days;
+  final RoutineStructure structure;
+  final TrainingExperience recommendedExperience;
+  final int? _cycleLength;
+  final int sessionMinutes;
+  final List<RoutineFocus> focusSummary;
+  final RoutineSource source;
+
+  int get cycleLength => _cycleLength ?? days.length;
 }
 
 class PlanTemplateDay {
@@ -215,12 +257,22 @@ class PlanTemplateDay {
     required this.title,
     required this.focus,
     required this.exercises,
-  });
+    int? dayNumber,
+    this.primaryFocus = RoutineFocus.fullBody,
+    this.secondaryFocuses = const <RoutineFocus>[],
+    this.minRecoveryHours = 24,
+  }) : _dayNumber = dayNumber;
 
   final int dayOffset;
   final String title;
   final String focus;
   final List<TemplateExercise> exercises;
+  final int? _dayNumber;
+  final RoutineFocus? primaryFocus;
+  final List<RoutineFocus> secondaryFocuses;
+  final int minRecoveryHours;
+
+  int get dayNumber => _dayNumber ?? dayOffset + 1;
 }
 
 class TemplateExercise {
@@ -236,6 +288,58 @@ class TemplateExercise {
   final ExerciseId exerciseId;
   final int sets;
   final RepRange? repRange;
+  final int? durationMinutes;
+  final int restSeconds;
+  final String note;
+}
+
+class CustomRoutineInput {
+  const CustomRoutineInput({
+    this.id,
+    required this.name,
+    this.description = '',
+    required this.days,
+  });
+
+  final String? id;
+  final String name;
+  final String description;
+  final List<CustomRoutineDayInput> days;
+}
+
+class CustomRoutineDayInput {
+  const CustomRoutineDayInput({
+    required this.title,
+    required this.focus,
+    required this.primaryFocus,
+    this.secondaryFocuses = const <RoutineFocus>[],
+    this.minRecoveryHours = 24,
+    required this.exercises,
+  });
+
+  final String title;
+  final String focus;
+  final RoutineFocus? primaryFocus;
+  final List<RoutineFocus> secondaryFocuses;
+  final int minRecoveryHours;
+  final List<CustomRoutineExerciseInput> exercises;
+}
+
+class CustomRoutineExerciseInput {
+  const CustomRoutineExerciseInput({
+    required this.exerciseId,
+    required this.sets,
+    required this.repRangeStart,
+    required this.repRangeEnd,
+    required this.durationMinutes,
+    required this.restSeconds,
+    this.note = '',
+  });
+
+  final ExerciseId exerciseId;
+  final int sets;
+  final int? repRangeStart;
+  final int? repRangeEnd;
   final int? durationMinutes;
   final int restSeconds;
   final String note;
@@ -263,12 +367,94 @@ class WorkoutDayPlan {
     required this.title,
     required this.focus,
     required this.exercises,
+    this.dayNumber = 1,
+    this.primaryFocus = RoutineFocus.fullBody,
+    this.secondaryFocuses = const <RoutineFocus>[],
+    this.minRecoveryHours = 24,
   });
 
   final DateTime date;
   final String title;
   final String focus;
   final List<PlannedExercise> exercises;
+  final int dayNumber;
+  final RoutineFocus? primaryFocus;
+  final List<RoutineFocus> secondaryFocuses;
+  final int minRecoveryHours;
+}
+
+class RoutineRecommendationInput {
+  const RoutineRecommendationInput({
+    required this.daysPerWeek,
+    required this.sessionMinutes,
+    required this.experience,
+    required this.feeling,
+  });
+
+  final int daysPerWeek;
+  final int sessionMinutes;
+  final TrainingExperience experience;
+  final RoutineFeeling feeling;
+}
+
+class RoutineRecommendation {
+  const RoutineRecommendation({
+    required this.primaryTemplateId,
+    required this.alternativeTemplateIds,
+    required this.reasonCode,
+  });
+
+  final String primaryTemplateId;
+  final List<String> alternativeTemplateIds;
+  final String reasonCode;
+}
+
+class RoutineProgressPreference {
+  const RoutineProgressPreference({
+    required this.templateId,
+    required this.dayIndex,
+    required this.startedAt,
+    required this.cycleStartedAt,
+    required this.lastCompletedDayIndex,
+    required this.lastCompletedAt,
+  });
+
+  final String templateId;
+  final int dayIndex;
+  final String? startedAt;
+  final String? cycleStartedAt;
+  final int? lastCompletedDayIndex;
+  final String? lastCompletedAt;
+}
+
+class RoutineProgress {
+  const RoutineProgress({
+    required this.templateId,
+    required this.dayIndex,
+    required this.lastCompletedDayIndex,
+    required this.lastCompletedAt,
+    this.startedAt,
+    DateTime? cycleStartedAt,
+  }) : cycleStartedAt = cycleStartedAt ?? startedAt;
+
+  final String templateId;
+  final int dayIndex;
+  final int? lastCompletedDayIndex;
+  final DateTime? lastCompletedAt;
+  final DateTime? startedAt;
+  final DateTime? cycleStartedAt;
+}
+
+class RoutineReadiness {
+  const RoutineReadiness({
+    required this.ready,
+    required this.remainingRecoveryHours,
+    required this.warningCode,
+  });
+
+  final bool ready;
+  final int remainingRecoveryHours;
+  final String? warningCode;
 }
 
 class PlannedExercise {
@@ -312,7 +498,7 @@ class WorkoutLog {
     required this.durationMinutes,
     required this.memo,
     required this.completed,
-    this.setEntries = const [],
+    this.setEntries = const <WorkoutSetLog>[],
   });
 
   final WorkoutLogId id;
@@ -330,7 +516,7 @@ class WorkoutLog {
 
   double get volumeKg {
     if (setEntries.isNotEmpty) {
-      return setEntries.fold(0, (sum, entry) => sum + entry.volumeKg);
+      return setEntries.fold<double>(0, (sum, entry) => sum + entry.volumeKg);
     }
     final reps = this.reps;
     final weightKg = this.weightKg;
@@ -352,7 +538,7 @@ class WorkoutLogInput {
     required this.durationMinutes,
     required this.memo,
     required this.completed,
-    this.setEntries = const [],
+    this.setEntries = const <WorkoutSetLog>[],
   });
 
   final PlannedExerciseId plannedExerciseId;
@@ -388,12 +574,14 @@ class WorkoutSetLog {
     required this.reps,
     required this.weightKg,
     required this.durationMinutes,
+    this.restSeconds,
   });
 
   final int order;
   final int? reps;
   final double? weightKg;
   final int? durationMinutes;
+  final int? restSeconds;
 
   double get volumeKg {
     final reps = this.reps;

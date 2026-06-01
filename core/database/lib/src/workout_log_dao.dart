@@ -9,6 +9,13 @@ abstract interface class WorkoutLogDao {
     required String endDate,
   });
 
+  Stream<List<WorkoutLogWithSets>> observeAll({required String sessionId});
+
+  Future<WorkoutLogWithSets?> latestByExercise({
+    required String sessionId,
+    required String exerciseId,
+  });
+
   Future<int> upsert(WorkoutLogEntity log);
 
   Future<void> insertSetLogs(List<WorkoutSetLogEntity> setLogs);
@@ -44,6 +51,27 @@ class InMemoryWorkoutLogDao implements WorkoutLogDao {
         endDate: endDate,
       );
     }
+  }
+
+  @override
+  Stream<List<WorkoutLogWithSets>> observeAll({
+    required String sessionId,
+  }) async* {
+    yield _queryAll(sessionId: sessionId);
+    await for (final _ in _changes.stream) {
+      yield _queryAll(sessionId: sessionId);
+    }
+  }
+
+  @override
+  Future<WorkoutLogWithSets?> latestByExercise({
+    required String sessionId,
+    required String exerciseId,
+  }) async {
+    final logs = _queryAll(
+      sessionId: sessionId,
+    ).where((entry) => entry.log.exerciseId == exerciseId).toList();
+    return logs.isEmpty ? null : logs.first;
   }
 
   @override
@@ -119,6 +147,23 @@ class InMemoryWorkoutLogDao implements WorkoutLogDao {
             )
             .toList()
           ..sort((a, b) => b.performedAt.compareTo(a.performedAt));
+    return logs
+        .map(
+          (log) => WorkoutLogWithSets(
+            log: log,
+            setLogs:
+                (_setLogs
+                    .where((setLog) => setLog.workoutLogId == log.id)
+                    .toList()
+                  ..sort((a, b) => a.setIndex.compareTo(b.setIndex))),
+          ),
+        )
+        .toList();
+  }
+
+  List<WorkoutLogWithSets> _queryAll({required String sessionId}) {
+    final logs = _logs.where((log) => log.sessionId == sessionId).toList()
+      ..sort((a, b) => b.performedAt.compareTo(a.performedAt));
     return logs
         .map(
           (log) => WorkoutLogWithSets(

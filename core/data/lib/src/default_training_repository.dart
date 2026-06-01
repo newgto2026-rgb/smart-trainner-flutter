@@ -1,11 +1,10 @@
-import 'dart:async';
-
 import 'package:smart_trainner_core_data/src/seed_training_content.dart';
 import 'package:smart_trainner_core_data/src/training_mappers.dart';
 import 'package:smart_trainner_core_database/smart_trainner_core_database.dart';
 import 'package:smart_trainner_core_datastore/smart_trainner_core_datastore.dart';
 import 'package:smart_trainner_core_domain/smart_trainner_core_domain.dart';
 import 'package:smart_trainner_core_model/smart_trainner_core_model.dart';
+import 'package:rxdart/rxdart.dart';
 
 class DefaultTrainingRepository implements TrainingRepository {
   DefaultTrainingRepository({
@@ -61,8 +60,16 @@ class DefaultTrainingRepository implements TrainingRepository {
   }
 
   @override
+  Stream<List<WorkoutLog>> observeLatestWorkoutLogs() {
+    final sessionId = preferences.activeSessionIdValue ?? defaultUserSessionId;
+    return workoutLogDao
+        .observeAll(sessionId: sessionId)
+        .map((entities) => entities.map((entity) => entity.toModel()).toList());
+  }
+
+  @override
   Stream<WeeklySummary> observeWeeklySummary(DateTime weekStartDate) {
-    return combineLatest2(
+    return Rx.combineLatest2(
       observeCurrentWeeklyPlan(weekStartDate),
       observeWorkoutLogs(weekStartDate),
       (plan, logs) => summaryCalculator.calculate(
@@ -177,48 +184,12 @@ class DefaultTrainingRepository implements TrainingRepository {
               note: item.note,
             );
           }).toList(),
+          dayNumber: day.dayNumber,
+          primaryFocus: day.primaryFocus,
+          secondaryFocuses: day.secondaryFocuses,
+          minRecoveryHours: day.minRecoveryHours,
         );
       }).toList(),
     );
   }
-}
-
-Stream<R> combineLatest2<A, B, R>(
-  Stream<A> first,
-  Stream<B> second,
-  R Function(A first, B second) combine,
-) {
-  late StreamController<R> controller;
-  StreamSubscription<A>? firstSubscription;
-  StreamSubscription<B>? secondSubscription;
-  A? latestFirst;
-  B? latestSecond;
-  var hasFirst = false;
-  var hasSecond = false;
-
-  void emitIfReady() {
-    if (hasFirst && hasSecond) {
-      controller.add(combine(latestFirst as A, latestSecond as B));
-    }
-  }
-
-  controller = StreamController<R>(
-    onListen: () {
-      firstSubscription = first.listen((value) {
-        latestFirst = value;
-        hasFirst = true;
-        emitIfReady();
-      });
-      secondSubscription = second.listen((value) {
-        latestSecond = value;
-        hasSecond = true;
-        emitIfReady();
-      });
-    },
-    onCancel: () async {
-      await firstSubscription?.cancel();
-      await secondSubscription?.cancel();
-    },
-  );
-  return controller.stream;
 }

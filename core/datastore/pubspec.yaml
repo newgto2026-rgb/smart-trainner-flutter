@@ -5,6 +5,9 @@ environment:
   sdk: ^3.9.0
 
 dependencies:
+  flutter:
+    sdk: flutter
+  shared_preferences: ^2.5.3
   smart_trainner_core_model:
     path: ../model
 

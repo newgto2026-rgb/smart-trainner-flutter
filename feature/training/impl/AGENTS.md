@@ -20,4 +20,5 @@
 ## Validation
 - Feature UI/controller change: `cd feature/training/impl && flutter test && flutter analyze`
 - Asset/localization change: `cd feature/training/impl && flutter test test/exercise_step_images_test.dart`
-- Core flow change: `cd app && flutter test integration_test`
+- Core flow change: `cd app && flutter test`
+- Real Android emulator UI change: `cd app && flutter drive --driver=test_driver/integration_test.dart --target=integration_test/training_smoke_test.dart -d emulator-5554`

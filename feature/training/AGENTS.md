@@ -20,4 +20,5 @@
 - Contract change: `cd feature/training/api && flutter analyze`
 - Entry wiring change: `cd feature/training/entry && flutter analyze`
 - Implementation change: `cd feature/training/impl && flutter test && flutter analyze`
-- Core flow change: `cd app && flutter test integration_test`
+- Core flow change: `cd app && flutter test`
+- Real Android emulator UI change: `cd app && flutter drive --driver=test_driver/integration_test.dart --target=integration_test/training_smoke_test.dart -d emulator-5554`

@@ -1,0 +1,9 @@
+name: smart_trainner_core_exercise_media
+publish_to: none
+
+environment:
+  sdk: ^3.9.0
+
+dev_dependencies:
+  lints: ^5.1.1
+  test: ^1.25.15

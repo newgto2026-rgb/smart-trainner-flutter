@@ -34,6 +34,7 @@ void main() {
           reps: 10,
           weightKg: 20,
           durationMinutes: null,
+          restSeconds: 60,
         ),
         WorkoutSetLogEntity(
           workoutLogId: 0,
@@ -41,6 +42,7 @@ void main() {
           reps: 10,
           weightKg: 25,
           durationMinutes: null,
+          restSeconds: 90,
         ),
         WorkoutSetLogEntity(
           workoutLogId: 0,
@@ -48,6 +50,7 @@ void main() {
           reps: 8,
           weightKg: 30,
           durationMinutes: null,
+          restSeconds: 120,
         ),
         WorkoutSetLogEntity(
           workoutLogId: 0,
@@ -55,6 +58,7 @@ void main() {
           reps: 8,
           weightKg: 32.5,
           durationMinutes: null,
+          restSeconds: 150,
         ),
       ],
     );
@@ -74,6 +78,12 @@ void main() {
       25,
       30,
       32.5,
+    ]);
+    expect(result.single.setLogs.map((log) => log.restSeconds), <int>[
+      60,
+      90,
+      120,
+      150,
     ]);
   });
 
@@ -107,5 +117,64 @@ void main() {
 
     expect(localLogs, hasLength(1));
     expect(localLogs.single.log.sessionId, 'local-default');
+  });
+
+  test('latestByExercise returns most recent matching log with sets', () async {
+    const oldLog = WorkoutLogEntity(
+      sessionId: 'local-default',
+      plannedExerciseId: '2026-05-20_leg_press',
+      exerciseId: 'leg_press',
+      performedDate: '2026-05-20',
+      performedAt: '2026-05-20T09:00:00',
+      sets: 1,
+      reps: 10,
+      weightKg: 20,
+      durationMinutes: null,
+      memo: '',
+      completed: true,
+    );
+    final latestLog = oldLog.copyWith(
+      plannedExerciseId: '2026-05-27_leg_press',
+      performedDate: '2026-05-27',
+      performedAt: '2026-05-27T09:00:00',
+      reps: 8,
+      weightKg: 30,
+    );
+
+    await dao.upsertWithSets(
+      log: oldLog,
+      setLogs: const <WorkoutSetLogEntity>[
+        WorkoutSetLogEntity(
+          workoutLogId: 0,
+          setIndex: 1,
+          reps: 10,
+          weightKg: 20,
+          durationMinutes: null,
+        ),
+      ],
+    );
+    await dao.upsertWithSets(
+      log: latestLog,
+      setLogs: const <WorkoutSetLogEntity>[
+        WorkoutSetLogEntity(
+          workoutLogId: 0,
+          setIndex: 1,
+          reps: 8,
+          weightKg: 30,
+          durationMinutes: null,
+          restSeconds: 120,
+        ),
+      ],
+    );
+
+    final result = await dao.latestByExercise(
+      sessionId: 'local-default',
+      exerciseId: 'leg_press',
+    );
+
+    expect(result?.log.plannedExerciseId, '2026-05-27_leg_press');
+    expect(result?.setLogs.single.reps, 8);
+    expect(result?.setLogs.single.weightKg, 30);
+    expect(result?.setLogs.single.restSeconds, 120);
   });
 }

@@ -1,0 +1,22 @@
+name: smart_trainner_feature_workout_data
+publish_to: none
+
+environment:
+  sdk: ^3.9.0
+
+dependencies:
+  smart_trainner_core_data:
+    path: ../../../core/data
+  smart_trainner_core_database:
+    path: ../../../core/database
+  smart_trainner_core_datastore:
+    path: ../../../core/datastore
+  smart_trainner_core_domain:
+    path: ../../../core/domain
+  smart_trainner_core_model:
+    path: ../../../core/model
+  smart_trainner_feature_workout_domain:
+    path: ../domain
+
+dev_dependencies:
+  lints: ^5.1.1

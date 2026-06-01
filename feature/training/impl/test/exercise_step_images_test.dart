@@ -4,10 +4,12 @@ import 'package:smart_trainner_feature_training_impl/smart_trainner_feature_trai
 void main() {
   test('every seed exercise id has variable step visuals', () {
     final expectedExerciseIds = <String>{
+      'bodyweight_squat',
       'leg_press',
       'goblet_squat',
       'box_squat',
       'dumbbell_split_squat',
+      'bulgarian_split_squat',
       'walking_lunge',
       'leg_extension',
       'leg_curl',
@@ -19,6 +21,7 @@ void main() {
       'chest_supported_row',
       'one_arm_dumbbell_row',
       'assisted_pullup',
+      'pullup',
       'face_pull',
       'machine_chest_press',
       'dumbbell_bench_press',
@@ -44,6 +47,7 @@ void main() {
       'barbell_back_squat',
       'barbell_bench_press',
       'conventional_deadlift',
+      'barbell_romanian_deadlift',
       'barbell_overhead_press',
       'dumbbell_step_up',
       'glute_bridge',
@@ -62,6 +66,7 @@ void main() {
       'incline_machine_press',
       'dumbbell_floor_press',
       'assisted_dip',
+      'dip',
       'cable_chest_press',
       'close_grip_pushup',
       'arnold_press',
@@ -130,6 +135,7 @@ void main() {
 
   test('trainer audit examples keep their expected step counts', () {
     expect(exerciseStepVisuals('dumbbell_curl'), hasLength(2));
+    expect(exerciseStepVisuals('bodyweight_squat'), hasLength(4));
     expect(exerciseStepVisuals('leg_press'), hasLength(3));
     expect(exerciseStepVisuals('goblet_squat'), hasLength(4));
     expect(exerciseStepVisuals('romanian_deadlift'), hasLength(5));
@@ -137,6 +143,10 @@ void main() {
     expect(exerciseStepVisuals('barbell_back_squat'), hasLength(5));
     expect(exerciseStepVisuals('barbell_bench_press'), hasLength(4));
     expect(exerciseStepVisuals('conventional_deadlift'), hasLength(5));
+    expect(exerciseStepVisuals('barbell_romanian_deadlift'), hasLength(4));
+    expect(exerciseStepVisuals('bulgarian_split_squat'), hasLength(4));
+    expect(exerciseStepVisuals('pullup'), hasLength(4));
+    expect(exerciseStepVisuals('dip'), hasLength(4));
     expect(exerciseStepVisuals('dumbbell_deadlift'), hasLength(4));
     expect(exerciseStepVisuals('dumbbell_floor_press'), hasLength(4));
     expect(exerciseStepVisuals('elliptical'), hasLength(3));

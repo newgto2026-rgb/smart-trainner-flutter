@@ -1,0 +1,16 @@
+name: smart_trainner_feature_routine_domain
+publish_to: none
+
+environment:
+  sdk: ^3.9.0
+
+dependencies:
+  collection: ^1.19.1
+  smart_trainner_core_domain:
+    path: ../../../core/domain
+  smart_trainner_core_model:
+    path: ../../../core/model
+
+dev_dependencies:
+  lints: ^5.1.1
+  test: ^1.25.15

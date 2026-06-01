@@ -66,6 +66,7 @@ class WorkoutSetLogEntity {
     required this.reps,
     required this.weightKg,
     required this.durationMinutes,
+    this.restSeconds,
   });
 
   final int id;
@@ -74,6 +75,7 @@ class WorkoutSetLogEntity {
   final int? reps;
   final double? weightKg;
   final int? durationMinutes;
+  final int? restSeconds;
 
   WorkoutSetLogEntity copyWith({
     int? id,
@@ -82,6 +84,7 @@ class WorkoutSetLogEntity {
     int? reps,
     double? weightKg,
     int? durationMinutes,
+    int? restSeconds,
   }) {
     return WorkoutSetLogEntity(
       id: id ?? this.id,
@@ -90,6 +93,7 @@ class WorkoutSetLogEntity {
       reps: reps ?? this.reps,
       weightKg: weightKg ?? this.weightKg,
       durationMinutes: durationMinutes ?? this.durationMinutes,
+      restSeconds: restSeconds ?? this.restSeconds,
     );
   }
 }

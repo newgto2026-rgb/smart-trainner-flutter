@@ -1,0 +1,12 @@
+name: smart_trainner_feature_exercise_api
+publish_to: none
+
+environment:
+  sdk: ^3.9.0
+
+dependencies:
+  smart_trainner_core_model:
+    path: ../../../core/model
+
+dev_dependencies:
+  lints: ^5.1.1

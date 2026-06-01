@@ -93,6 +93,92 @@ void main() {
     expect(result.completionRate, 0);
     expect(result.insight, contains('플랜'));
   });
+
+  test('calculate excludes full body from weakest muscle insight', () {
+    const completedGroups = <MuscleGroup>[
+      MuscleGroup.lowerBody,
+      MuscleGroup.back,
+      MuscleGroup.chest,
+      MuscleGroup.shoulders,
+      MuscleGroup.biceps,
+      MuscleGroup.triceps,
+      MuscleGroup.forearms,
+      MuscleGroup.core,
+    ];
+    final completedExercises = completedGroups.map((group) {
+      return _plannedExercise(
+        id: 'completed_${group.name}',
+        muscleGroup: group,
+      );
+    }).toList();
+    final extraExercises = List<PlannedExercise>.generate(4, (index) {
+      return _plannedExercise(
+        id: 'extra_lower_$index',
+        muscleGroup: MuscleGroup.lowerBody,
+      );
+    });
+    final plan = WeeklyPlan(
+      id: const PlanId('plan'),
+      templateId: 'balanced',
+      name: '균형 루틴',
+      weekStartDate: weekStart,
+      days: <WorkoutDayPlan>[
+        WorkoutDayPlan(
+          date: weekStart,
+          title: '균형',
+          focus: '전신',
+          exercises: <PlannedExercise>[
+            ...completedExercises,
+            ...extraExercises,
+          ],
+        ),
+      ],
+    );
+    final logs = completedExercises.indexed.map((entry) {
+      return _completedLog(id: entry.$1 + 1, planned: entry.$2);
+    }).toList();
+
+    final result = calculator.calculate(
+      weekStartDate: weekStart,
+      plan: plan,
+      logs: logs,
+    );
+
+    expect(result.completionRate, lessThan(80));
+    expect(result.insight, isNot(contains(MuscleGroup.fullBody.displayName)));
+    expect(result.insight, contains(MuscleGroup.lowerBody.displayName));
+  });
+}
+
+PlannedExercise _plannedExercise({
+  required String id,
+  required MuscleGroup muscleGroup,
+}) {
+  return PlannedExercise(
+    id: PlannedExerciseId('2026-05-18_$id'),
+    exercise: _exercise(id, muscleGroup),
+    sets: 3,
+    repRange: const RepRange(10, 12),
+    durationMinutes: null,
+    restSeconds: 90,
+    note: '',
+  );
+}
+
+WorkoutLog _completedLog({required int id, required PlannedExercise planned}) {
+  return WorkoutLog(
+    id: WorkoutLogId(id),
+    sessionId: const UserSessionId('local-default'),
+    plannedExerciseId: planned.id,
+    exerciseId: planned.exercise.id,
+    performedAt: DateTime(2026, 5, 18, 20),
+    sets: 3,
+    reps: 10,
+    weightKg: 10,
+    durationMinutes: null,
+    memo: '',
+    completed: true,
+  );
 }
 
 Exercise _exercise(String id, MuscleGroup muscleGroup) {
