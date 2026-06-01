@@ -6,19 +6,23 @@ void main() {
   runApp(const SmartTrainnerApp());
 }
 
-class SmartTrainnerApp extends StatelessWidget {
+class SmartTrainnerApp extends StatefulWidget {
   const SmartTrainnerApp({super.key});
 
   @override
+  State<SmartTrainnerApp> createState() => _SmartTrainnerAppState();
+}
+
+class _SmartTrainnerAppState extends State<SmartTrainnerApp> {
+  late final trainingFeatureEntry = createTrainingFeatureEntry();
+
+  @override
   Widget build(BuildContext context) {
-    final trainingFeatureEntry = createTrainingFeatureEntry();
     return MaterialApp(
       title: 'Smart Trainner',
       debugShowCheckedModeBanner: false,
       theme: smartTrainnerTheme(),
-      home: Builder(
-        builder: trainingFeatureEntry.build,
-      ),
+      home: Builder(builder: trainingFeatureEntry.build),
     );
   }
 }

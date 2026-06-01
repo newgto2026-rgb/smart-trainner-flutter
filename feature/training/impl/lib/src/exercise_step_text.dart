@@ -4,6 +4,9 @@ String instructionWithoutRepeatedStepTitle(String label, String instruction) {
     return instruction.trim();
   }
   return instruction
-      .replaceFirst(RegExp('^\\s*${RegExp.escape(trimmedLabel)}\\s*[:：]\\s*'), '')
+      .replaceFirst(
+        RegExp('^\\s*${RegExp.escape(trimmedLabel)}\\s*[:：]\\s*'),
+        '',
+      )
       .trim();
 }
