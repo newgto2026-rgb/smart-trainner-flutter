@@ -83,12 +83,19 @@ class TrainingController extends ChangeNotifier {
   }
 
   void selectExercise(ExerciseId exerciseId) {
+    showExerciseMethod(exerciseId, selectExercisesTab: true);
+  }
+
+  void showExerciseMethod(
+    ExerciseId exerciseId, {
+    bool selectExercisesTab = false,
+  }) {
     final exercise = _state.exercises.firstWhere(
       (exercise) => exercise.id == exerciseId,
     );
     _state = _state.copyWith(
       detailDialogExercise: exercise,
-      selectedTab: TrainingTab.exercises,
+      selectedTab: selectExercisesTab ? TrainingTab.exercises : null,
     );
     notifyListeners();
   }

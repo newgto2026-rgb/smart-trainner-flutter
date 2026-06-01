@@ -115,13 +115,6 @@ class _TrainingRouteState extends State<TrainingRoute> {
                   controller: _controller,
                 ),
               ),
-            if (detailDialogExercise != null)
-              Positioned.fill(
-                child: _ExerciseDetailDialogScrim(
-                  exercise: detailDialogExercise,
-                  controller: _controller,
-                ),
-              ),
             if (state.routineLibraryVisible)
               Positioned.fill(
                 child: _RoutineLibraryDialogScrim(
@@ -144,6 +137,13 @@ class _TrainingRouteState extends State<TrainingRoute> {
               Positioned.fill(
                 child: _CustomRoutineBuilderScrim(
                   state: state,
+                  controller: _controller,
+                ),
+              ),
+            if (detailDialogExercise != null)
+              Positioned.fill(
+                child: _ExerciseDetailDialogScrim(
+                  exercise: detailDialogExercise,
                   controller: _controller,
                 ),
               ),
@@ -1703,7 +1703,7 @@ class _CustomExercisePicker extends StatelessWidget {
               expanded: builder.expandedExerciseGroups.contains(group),
               onToggle: () => controller.toggleCustomExerciseGroup(group),
               onAddExercise: controller.addCustomExercise,
-              onViewExercise: controller.selectExercise,
+              onViewExercise: controller.showExerciseMethod,
             ),
       ],
     );

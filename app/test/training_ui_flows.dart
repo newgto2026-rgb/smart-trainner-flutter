@@ -317,6 +317,23 @@ void runTrainingUiFlowTests() {
         findsNothing,
       );
       await _tapKey(tester, 'training_custom_exercise_group_CHEST');
+      await _tapKey(
+        tester,
+        'training_custom_view_exercise_machine_chest_press',
+      );
+      expect(
+        find.byKey(const Key('training_exercise_detail_dialog')),
+        findsOneWidget,
+      );
+      await _tapKey(tester, 'training_close_exercise_detail');
+      expect(
+        find.byKey(const Key('training_exercise_detail_dialog')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const Key('training_custom_routine_builder')),
+        findsOneWidget,
+      );
       await _tapKey(tester, 'training_custom_add_exercise_machine_chest_press');
       expect(
         find.byKey(
