@@ -41,15 +41,21 @@ class TrainingPreferencesDataSource {
   }
 
   Future<UserSession> startDefaultSession() async {
-    _activeSession = const UserSession(
-      id: UserSessionId(defaultUserSessionId),
-      displayName: _defaultDisplayName,
-      email: null,
-      provider: AuthProvider.local,
-      linkedAt: null,
+    return startSession(
+      const UserSession(
+        id: UserSessionId(defaultUserSessionId),
+        displayName: _defaultDisplayName,
+        email: null,
+        provider: AuthProvider.local,
+        linkedAt: null,
+      ),
     );
+  }
+
+  Future<UserSession> startSession(UserSession session) async {
+    _activeSession = session;
     _activeSessionController.add(_activeSession);
-    return _activeSession!;
+    return session;
   }
 
   Future<void> clearActiveSession() async {

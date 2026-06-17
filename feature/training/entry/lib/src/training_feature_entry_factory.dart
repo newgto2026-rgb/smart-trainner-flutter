@@ -7,8 +7,10 @@ import 'package:smart_trainner_feature_training_impl/smart_trainner_feature_trai
 
 TrainingFeatureEntry createTrainingFeatureEntry() {
   final preferences = TrainingPreferencesDataSource();
+  final customExerciseDao = InMemoryCustomExerciseDao();
   final workoutLogDao = InMemoryWorkoutLogDao();
   final repository = DefaultTrainingRepository(
+    customExerciseDao: customExerciseDao,
     workoutLogDao: workoutLogDao,
     preferences: preferences,
     summaryCalculator: WeeklySummaryCalculator(),
@@ -20,6 +22,7 @@ TrainingFeatureEntry createTrainingFeatureEntry() {
     observeCurrentWeeklyPlan: ObserveCurrentWeeklyPlanUseCase(repository),
     observeWorkoutLogs: ObserveWorkoutLogsUseCase(repository),
     observeWeeklySummary: ObserveWeeklySummaryUseCase(repository),
+    createCustomExercise: CreateCustomExerciseUseCase(repository),
     selectPlanTemplate: SelectPlanTemplateUseCase(repository),
     saveWorkoutLog: SaveWorkoutLogUseCase(repository),
   );

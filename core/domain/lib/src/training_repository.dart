@@ -24,6 +24,9 @@ abstract interface class TrainingRepository {
   Stream<List<WorkoutLog>> observeWorkoutLogs(DateTime weekStartDate);
   Stream<WeeklySummary> observeWeeklySummary(DateTime weekStartDate);
   Future<Exercise?> getExercise(ExerciseId id);
+  Future<OperationResult<Exercise>> createCustomExercise(
+    CustomExerciseInput input,
+  );
   Future<OperationResult<void>> selectPlanTemplate(String templateId);
   Future<OperationResult<void>> saveWorkoutLog(WorkoutLogInput input);
 }

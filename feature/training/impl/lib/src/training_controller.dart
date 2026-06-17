@@ -12,10 +12,12 @@ class TrainingController extends ChangeNotifier {
     required ObserveCurrentWeeklyPlanUseCase observeCurrentWeeklyPlan,
     required ObserveWorkoutLogsUseCase observeWorkoutLogs,
     required ObserveWeeklySummaryUseCase observeWeeklySummary,
+    required CreateCustomExerciseUseCase createCustomExercise,
     required SelectPlanTemplateUseCase selectPlanTemplate,
     required SaveWorkoutLogUseCase saveWorkoutLog,
     DateTime? today,
-  }) : _selectPlanTemplate = selectPlanTemplate,
+  }) : _createCustomExercise = createCustomExercise,
+       _selectPlanTemplate = selectPlanTemplate,
        _saveWorkoutLog = saveWorkoutLog,
        _weekStart = _mondayOf(today ?? DateTime.now()) {
     _subscriptions
@@ -54,6 +56,7 @@ class TrainingController extends ChangeNotifier {
       );
   }
 
+  final CreateCustomExerciseUseCase _createCustomExercise;
   final SelectPlanTemplateUseCase _selectPlanTemplate;
   final SaveWorkoutLogUseCase _saveWorkoutLog;
   final DateTime _weekStart;
@@ -83,12 +86,136 @@ class TrainingController extends ChangeNotifier {
     _state = _state.copyWith(
       selectedExercise: exercise,
       selectedTab: TrainingTab.exercises,
+      clearLastCreatedCustomExerciseId: true,
     );
     notifyListeners();
   }
 
   void dismissExerciseDetail() {
-    _state = _state.copyWith(clearSelectedExercise: true);
+    _state = _state.copyWith(
+      clearSelectedExercise: true,
+      clearLastCreatedCustomExerciseId: true,
+    );
+    notifyListeners();
+  }
+
+  void showCustomExerciseForm() {
+    _state = _state.copyWith(
+      isCustomExerciseFormVisible: true,
+      customExerciseForm: const CustomExerciseFormState(),
+      clearCustomExerciseFormError: true,
+      clearLastCreatedCustomExerciseId: true,
+    );
+    notifyListeners();
+  }
+
+  void dismissCustomExerciseForm() {
+    _state = _state.copyWith(
+      isCustomExerciseFormVisible: false,
+      customExerciseForm: const CustomExerciseFormState(),
+      clearCustomExerciseFormError: true,
+    );
+    notifyListeners();
+  }
+
+  void updateCustomExerciseName(String value) {
+    _updateCustomExerciseForm((form) => form.copyWith(name: value.take(60)));
+  }
+
+  void updateCustomExerciseMuscleGroup(MuscleGroup value) {
+    _updateCustomExerciseForm((form) => form.copyWith(muscleGroup: value));
+  }
+
+  void updateCustomExerciseEquipment(EquipmentType value) {
+    _updateCustomExerciseForm((form) => form.copyWith(equipment: value));
+  }
+
+  void updateCustomExerciseDifficulty(DifficultyLevel value) {
+    _updateCustomExerciseForm((form) => form.copyWith(difficulty: value));
+  }
+
+  void updateCustomExerciseTargetType(CustomExerciseTargetType value) {
+    _updateCustomExerciseForm((form) => form.copyWith(targetType: value));
+  }
+
+  void updateCustomExerciseSummary(String value) {
+    _updateCustomExerciseForm(
+      (form) => form.copyWith(summary: value.take(160)),
+    );
+  }
+
+  void updateCustomExerciseInstructions(String value) {
+    _updateCustomExerciseForm(
+      (form) => form.copyWith(instructions: value.take(360)),
+    );
+  }
+
+  void updateCustomExerciseSafetyCues(String value) {
+    _updateCustomExerciseForm(
+      (form) => form.copyWith(safetyCues: value.take(240)),
+    );
+  }
+
+  void updateCustomExerciseDefaultSets(String value) {
+    _updateCustomExerciseForm(
+      (form) => form.copyWith(defaultSets: value.onlyNumber()),
+    );
+  }
+
+  void updateCustomExerciseRepRangeFirst(String value) {
+    _updateCustomExerciseForm(
+      (form) => form.copyWith(repRangeFirst: value.onlyNumber()),
+    );
+  }
+
+  void updateCustomExerciseRepRangeLast(String value) {
+    _updateCustomExerciseForm(
+      (form) => form.copyWith(repRangeLast: value.onlyNumber()),
+    );
+  }
+
+  void updateCustomExerciseDurationMinutes(String value) {
+    _updateCustomExerciseForm(
+      (form) => form.copyWith(durationMinutes: value.onlyNumber()),
+    );
+  }
+
+  void updateCustomExerciseRestSeconds(String value) {
+    _updateCustomExerciseForm(
+      (form) => form.copyWith(restSeconds: value.onlyNumber()),
+    );
+  }
+
+  void updateCustomExerciseImagePath(String value) {
+    _updateCustomExerciseForm((form) => form.copyWith(imagePath: value));
+  }
+
+  Future<void> saveCustomExercise() async {
+    final form = _state.customExerciseForm;
+    final inputResult = form.toInput();
+    final error = inputResult.error;
+    if (error != null) {
+      _state = _state.copyWith(customExerciseFormError: error);
+      notifyListeners();
+      return;
+    }
+    final result = await _createCustomExercise(inputResult.input!);
+    final exercise = result.value;
+    if (!result.isSuccess || exercise == null) {
+      _state = _state.copyWith(
+        customExerciseFormError: CustomExerciseFormError.saveFailed,
+      );
+      notifyListeners();
+      return;
+    }
+    _state = _state.copyWith(
+      isCustomExerciseFormVisible: false,
+      customExerciseForm: const CustomExerciseFormState(),
+      clearCustomExerciseFormError: true,
+      selectedExercise: exercise,
+      selectedTab: TrainingTab.exercises,
+      lastCreatedCustomExerciseId: exercise.id,
+    );
     notifyListeners();
   }
 
@@ -247,6 +374,16 @@ class TrainingController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void _updateCustomExerciseForm(
+    CustomExerciseFormState Function(CustomExerciseFormState form) update,
+  ) {
+    _state = _state.copyWith(
+      customExerciseForm: update(_state.customExerciseForm),
+      clearCustomExerciseFormError: true,
+    );
+    notifyListeners();
+  }
+
   void _refreshSelectedPlannedExercise() {
     final plan = _state.plan;
     if (plan == null) {
@@ -363,6 +500,122 @@ extension RecordSetFormsMapper on List<RecordSetFormState> {
       );
     }).toList();
   }
+}
+
+extension _CustomExerciseFormMapper on CustomExerciseFormState {
+  _CustomExerciseInputResult toInput() {
+    final trimmedName = name.trim();
+    if (trimmedName.isEmpty) {
+      return const _CustomExerciseInputResult.error(
+        CustomExerciseFormError.name,
+      );
+    }
+    final muscleGroup = this.muscleGroup;
+    if (muscleGroup == null) {
+      return const _CustomExerciseInputResult.error(
+        CustomExerciseFormError.muscleGroup,
+      );
+    }
+    final equipment = this.equipment;
+    if (equipment == null) {
+      return const _CustomExerciseInputResult.error(
+        CustomExerciseFormError.equipment,
+      );
+    }
+    final difficulty = this.difficulty;
+    if (difficulty == null) {
+      return const _CustomExerciseInputResult.error(
+        CustomExerciseFormError.difficulty,
+      );
+    }
+    final trimmedSummary = summary.trim();
+    if (trimmedSummary.isEmpty) {
+      return const _CustomExerciseInputResult.error(
+        CustomExerciseFormError.summary,
+      );
+    }
+    final instructions = _cleanLines(this.instructions);
+    if (instructions.isEmpty) {
+      return const _CustomExerciseInputResult.error(
+        CustomExerciseFormError.instructions,
+      );
+    }
+    final safetyCues = _cleanLines(this.safetyCues);
+    if (safetyCues.isEmpty) {
+      return const _CustomExerciseInputResult.error(
+        CustomExerciseFormError.safetyCues,
+      );
+    }
+    final sets = int.tryParse(defaultSets);
+    if (sets == null || sets < 1 || sets > maxRecordSets) {
+      return const _CustomExerciseInputResult.error(
+        CustomExerciseFormError.sets,
+      );
+    }
+    final rest = int.tryParse(restSeconds);
+    if (rest == null || rest < 15 || rest > 600) {
+      return const _CustomExerciseInputResult.error(
+        CustomExerciseFormError.rest,
+      );
+    }
+    RepRange? repRange;
+    int? duration;
+    if (targetType == CustomExerciseTargetType.reps) {
+      final first = int.tryParse(repRangeFirst);
+      final last = int.tryParse(repRangeLast);
+      if (first == null ||
+          last == null ||
+          first < 1 ||
+          last > 50 ||
+          first > last) {
+        return const _CustomExerciseInputResult.error(
+          CustomExerciseFormError.reps,
+        );
+      }
+      repRange = RepRange(first, last);
+    } else {
+      duration = int.tryParse(durationMinutes);
+      if (duration == null || duration < 1 || duration > 240) {
+        return const _CustomExerciseInputResult.error(
+          CustomExerciseFormError.duration,
+        );
+      }
+    }
+    final trimmedImagePath = imagePath.trim();
+    return _CustomExerciseInputResult.input(
+      CustomExerciseInput(
+        name: trimmedName,
+        muscleGroup: muscleGroup,
+        equipment: equipment,
+        difficulty: difficulty,
+        summary: trimmedSummary,
+        instructions: instructions,
+        safetyCues: safetyCues,
+        defaultSets: sets,
+        defaultRepRange: repRange,
+        defaultDurationMinutes: duration,
+        restSeconds: rest,
+        imagePath: trimmedImagePath.isEmpty ? null : trimmedImagePath,
+      ),
+    );
+  }
+}
+
+class _CustomExerciseInputResult {
+  const _CustomExerciseInputResult.input(this.input) : error = null;
+
+  const _CustomExerciseInputResult.error(this.error) : input = null;
+
+  final CustomExerciseInput? input;
+  final CustomExerciseFormError? error;
+}
+
+List<String> _cleanLines(String value) {
+  return value
+      .split('\n')
+      .map((line) => line.trim())
+      .where((line) => line.isNotEmpty)
+      .toList();
 }
 
 extension NumericInputFilters on String {

@@ -55,6 +55,16 @@ class GetExerciseUseCase {
   Future<Exercise?> call(ExerciseId id) => repository.getExercise(id);
 }
 
+class CreateCustomExerciseUseCase {
+  const CreateCustomExerciseUseCase(this.repository);
+
+  final TrainingRepository repository;
+
+  Future<OperationResult<Exercise>> call(CustomExerciseInput input) {
+    return repository.createCustomExercise(input);
+  }
+}
+
 class SaveWorkoutLogUseCase {
   const SaveWorkoutLogUseCase(this.repository);
 

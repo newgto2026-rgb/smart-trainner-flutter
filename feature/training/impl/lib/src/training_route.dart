@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:smart_trainner_core_designsystem/smart_trainner_core_designsystem.dart';
 import 'package:smart_trainner_core_domain/smart_trainner_core_domain.dart';
@@ -14,6 +16,7 @@ class TrainingRoute extends StatefulWidget {
     required this.observeCurrentWeeklyPlan,
     required this.observeWorkoutLogs,
     required this.observeWeeklySummary,
+    required this.createCustomExercise,
     required this.selectPlanTemplate,
     required this.saveWorkoutLog,
     this.today,
@@ -25,6 +28,7 @@ class TrainingRoute extends StatefulWidget {
   final ObserveCurrentWeeklyPlanUseCase observeCurrentWeeklyPlan;
   final ObserveWorkoutLogsUseCase observeWorkoutLogs;
   final ObserveWeeklySummaryUseCase observeWeeklySummary;
+  final CreateCustomExerciseUseCase createCustomExercise;
   final SelectPlanTemplateUseCase selectPlanTemplate;
   final SaveWorkoutLogUseCase saveWorkoutLog;
   final DateTime? today;
@@ -45,6 +49,7 @@ class _TrainingRouteState extends State<TrainingRoute> {
       observeCurrentWeeklyPlan: widget.observeCurrentWeeklyPlan,
       observeWorkoutLogs: widget.observeWorkoutLogs,
       observeWeeklySummary: widget.observeWeeklySummary,
+      createCustomExercise: widget.createCustomExercise,
       selectPlanTemplate: widget.selectPlanTemplate,
       saveWorkoutLog: widget.saveWorkoutLog,
       today: widget.today,
@@ -64,6 +69,7 @@ class _TrainingRouteState extends State<TrainingRoute> {
       builder: (context, _) {
         final state = _controller.state;
         final recording = state.recordingPlannedExercise;
+        final customExerciseFormVisible = state.isCustomExerciseFormVisible;
         return Scaffold(
           appBar: AppBar(
             title: const Text('Smart Trainer', key: Key('training_app_title')),
@@ -80,6 +86,13 @@ class _TrainingRouteState extends State<TrainingRoute> {
                     child: _RecordDialogScrim(
                       state: state,
                       planned: recording,
+                      controller: _controller,
+                    ),
+                  ),
+                if (customExerciseFormVisible)
+                  Positioned.fill(
+                    child: _CustomExerciseDialogScrim(
+                      state: state,
                       controller: _controller,
                     ),
                   ),
@@ -148,6 +161,8 @@ class _TrainingBody extends StatelessWidget {
         selectedExercise != null) {
       return _ExerciseDetail(
         exercise: selectedExercise,
+        showSavedMessage:
+            state.lastCreatedCustomExerciseId == selectedExercise.id,
         onBack: controller.dismissExerciseDetail,
       );
     }
@@ -262,8 +277,14 @@ class _ExercisesTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final customExercises = state.exercises
+        .where((exercise) => exercise.metadata.isOwnedLibraryItem)
+        .toList();
+    final seedExercises = state.exercises
+        .where((exercise) => !exercise.metadata.isOwnedLibraryItem)
+        .toList();
     final grouped = <MuscleGroup, List<Exercise>>{};
-    for (final exercise in state.exercises) {
+    for (final exercise in seedExercises) {
       grouped
           .putIfAbsent(exercise.muscleGroup, () => <Exercise>[])
           .add(exercise);
@@ -272,8 +293,38 @@ class _ExercisesTab extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: <Widget>[
-        _SectionTitle(title: '운동 라이브러리'),
+        Row(
+          children: <Widget>[
+            const Expanded(child: _SectionTitle(title: '운동 라이브러리')),
+            FilledButton.icon(
+              key: const Key('training_add_custom_exercise_button'),
+              onPressed: controller.showCustomExerciseForm,
+              icon: const Icon(Icons.add),
+              label: const Text('운동 추가'),
+            ),
+          ],
+        ),
         const SizedBox(height: 12),
+        if (customExercises.isNotEmpty) ...<Widget>[
+          Text(
+            '내 운동',
+            key: const Key('training_my_exercises_section'),
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 8),
+          ...customExercises.map((exercise) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: _ExerciseRow(
+                exercise: exercise,
+                onTap: () => controller.selectExercise(exercise.id),
+              ),
+            );
+          }),
+          const SizedBox(height: 8),
+        ],
         for (final entry in grouped.entries) ...<Widget>[
           Text(
             entry.key.displayName,
@@ -328,9 +379,14 @@ class _AnalysisTab extends StatelessWidget {
 }
 
 class _ExerciseDetail extends StatelessWidget {
-  const _ExerciseDetail({required this.exercise, required this.onBack});
+  const _ExerciseDetail({
+    required this.exercise,
+    required this.showSavedMessage,
+    required this.onBack,
+  });
 
   final Exercise exercise;
+  final bool showSavedMessage;
   final VoidCallback onBack;
 
   @override
@@ -354,6 +410,24 @@ class _ExerciseDetail extends StatelessWidget {
             context,
           ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900),
         ),
+        if (exercise.metadata.isOwnedLibraryItem) ...<Widget>[
+          const SizedBox(height: 8),
+          const _SourceBadge(
+            key: Key('training_exercise_source_badge_owned'),
+            label: '내 운동',
+          ),
+        ],
+        if (showSavedMessage) ...<Widget>[
+          const SizedBox(height: 8),
+          const Text(
+            '내 운동에 저장했습니다.',
+            key: Key('training_custom_exercise_saved_owner_message'),
+            style: TextStyle(
+              color: SmartTrainnerColors.green,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
         const SizedBox(height: 8),
         Text(
           exercise.summary,
@@ -364,6 +438,470 @@ class _ExerciseDetail extends StatelessWidget {
         const SizedBox(height: 16),
         _BulletSection(title: '안전 큐', bullets: exercise.safetyCues),
       ],
+    );
+  }
+}
+
+class _CustomExerciseDialogScrim extends StatelessWidget {
+  const _CustomExerciseDialogScrim({
+    required this.state,
+    required this.controller,
+  });
+
+  final TrainingUiState state;
+  final TrainingController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: Colors.black54,
+      child: Center(
+        child: _CustomExerciseDialog(state: state, controller: controller),
+      ),
+    );
+  }
+}
+
+class _CustomExerciseDialog extends StatelessWidget {
+  const _CustomExerciseDialog({required this.state, required this.controller});
+
+  final TrainingUiState state;
+  final TrainingController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final form = state.customExerciseForm;
+    return Material(
+      borderRadius: BorderRadius.circular(8),
+      clipBehavior: Clip.antiAlias,
+      child: ConstrainedBox(
+        key: const Key('training_custom_exercise_form'),
+        constraints: const BoxConstraints(maxWidth: 620, maxHeight: 720),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 8, 8),
+              child: Row(
+                children: <Widget>[
+                  Expanded(
+                    child: Text(
+                      '내 운동 추가',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: controller.dismissCustomExerciseForm,
+                    icon: const Icon(Icons.close),
+                    tooltip: '닫기',
+                  ),
+                ],
+              ),
+            ),
+            Flexible(
+              child: ListView(
+                key: const Key('training_custom_exercise_form_scroll'),
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                shrinkWrap: true,
+                children: <Widget>[
+                  const _OwnerContext(),
+                  const SizedBox(height: 14),
+                  _CustomExerciseImagePreview(imagePath: form.imagePath),
+                  const SizedBox(height: 16),
+                  const _SectionTitle(title: '기본 정보'),
+                  const SizedBox(height: 10),
+                  TextFormField(
+                    key: const Key('training_custom_exercise_name_input'),
+                    initialValue: form.name,
+                    decoration: const InputDecoration(
+                      labelText: '운동 이름',
+                      border: OutlineInputBorder(),
+                    ),
+                    onChanged: controller.updateCustomExerciseName,
+                  ),
+                  _CustomExerciseErrorText(
+                    current: state.customExerciseFormError,
+                    target: CustomExerciseFormError.name,
+                  ),
+                  const SizedBox(height: 10),
+                  _CustomExerciseDropdown<MuscleGroup>(
+                    keyName: 'training_custom_exercise_muscle_group_dropdown',
+                    labelText: '카테고리',
+                    value: form.muscleGroup,
+                    values: MuscleGroup.values,
+                    displayName: (value) => value.displayName,
+                    optionKey: (value) =>
+                        'training_custom_exercise_muscle_group_option_${value.name}',
+                    onChanged: controller.updateCustomExerciseMuscleGroup,
+                  ),
+                  _CustomExerciseErrorText(
+                    current: state.customExerciseFormError,
+                    target: CustomExerciseFormError.muscleGroup,
+                  ),
+                  const SizedBox(height: 10),
+                  _CustomExerciseDropdown<EquipmentType>(
+                    keyName: 'training_custom_exercise_equipment_dropdown',
+                    labelText: '장비',
+                    value: form.equipment,
+                    values: EquipmentType.values,
+                    displayName: (value) => value.displayName,
+                    optionKey: (value) =>
+                        'training_custom_exercise_equipment_option_${value.name}',
+                    onChanged: controller.updateCustomExerciseEquipment,
+                  ),
+                  _CustomExerciseErrorText(
+                    current: state.customExerciseFormError,
+                    target: CustomExerciseFormError.equipment,
+                  ),
+                  const SizedBox(height: 10),
+                  _CustomExerciseDropdown<DifficultyLevel>(
+                    keyName: 'training_custom_exercise_difficulty_dropdown',
+                    labelText: '난이도',
+                    value: form.difficulty,
+                    values: DifficultyLevel.values,
+                    displayName: (value) => value.displayName,
+                    optionKey: (value) =>
+                        'training_custom_exercise_difficulty_option_${value.name}',
+                    onChanged: controller.updateCustomExerciseDifficulty,
+                  ),
+                  _CustomExerciseErrorText(
+                    current: state.customExerciseFormError,
+                    target: CustomExerciseFormError.difficulty,
+                  ),
+                  const SizedBox(height: 16),
+                  const _SectionTitle(title: '상세 정보'),
+                  const SizedBox(height: 10),
+                  TextFormField(
+                    key: const Key('training_custom_exercise_summary_input'),
+                    initialValue: form.summary,
+                    minLines: 2,
+                    maxLines: 3,
+                    decoration: const InputDecoration(
+                      labelText: '기본 설명',
+                      border: OutlineInputBorder(),
+                    ),
+                    onChanged: controller.updateCustomExerciseSummary,
+                  ),
+                  _CustomExerciseErrorText(
+                    current: state.customExerciseFormError,
+                    target: CustomExerciseFormError.summary,
+                  ),
+                  const SizedBox(height: 10),
+                  TextFormField(
+                    key: const Key(
+                      'training_custom_exercise_instructions_input',
+                    ),
+                    initialValue: form.instructions,
+                    minLines: 3,
+                    maxLines: 5,
+                    decoration: const InputDecoration(
+                      labelText: '운동 방법',
+                      helperText: '한 줄에 한 단계씩 입력',
+                      border: OutlineInputBorder(),
+                    ),
+                    onChanged: controller.updateCustomExerciseInstructions,
+                  ),
+                  _CustomExerciseErrorText(
+                    current: state.customExerciseFormError,
+                    target: CustomExerciseFormError.instructions,
+                  ),
+                  const SizedBox(height: 10),
+                  TextFormField(
+                    key: const Key('training_custom_exercise_safety_input'),
+                    initialValue: form.safetyCues,
+                    minLines: 2,
+                    maxLines: 4,
+                    decoration: const InputDecoration(
+                      labelText: '주의 포인트',
+                      helperText: '한 줄에 하나씩 입력',
+                      border: OutlineInputBorder(),
+                    ),
+                    onChanged: controller.updateCustomExerciseSafetyCues,
+                  ),
+                  _CustomExerciseErrorText(
+                    current: state.customExerciseFormError,
+                    target: CustomExerciseFormError.safetyCues,
+                  ),
+                  const SizedBox(height: 10),
+                  TextFormField(
+                    key: const Key('training_custom_exercise_image_path_input'),
+                    initialValue: form.imagePath,
+                    decoration: const InputDecoration(
+                      labelText: '이미지 경로(선택)',
+                      border: OutlineInputBorder(),
+                    ),
+                    onChanged: controller.updateCustomExerciseImagePath,
+                  ),
+                  const SizedBox(height: 16),
+                  const _SectionTitle(title: '기본 기록값'),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: <Widget>[
+                      Expanded(
+                        child: TextFormField(
+                          key: const Key('training_custom_exercise_sets_input'),
+                          initialValue: form.defaultSets,
+                          decoration: const InputDecoration(
+                            labelText: '세트',
+                            border: OutlineInputBorder(),
+                          ),
+                          keyboardType: TextInputType.number,
+                          onChanged: controller.updateCustomExerciseDefaultSets,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: TextFormField(
+                          key: const Key(
+                            'training_custom_exercise_rest_seconds_input',
+                          ),
+                          initialValue: form.restSeconds,
+                          decoration: const InputDecoration(
+                            labelText: '휴식(초)',
+                            border: OutlineInputBorder(),
+                          ),
+                          keyboardType: TextInputType.number,
+                          onChanged: controller.updateCustomExerciseRestSeconds,
+                        ),
+                      ),
+                    ],
+                  ),
+                  _CustomExerciseErrorText(
+                    current: state.customExerciseFormError,
+                    target: CustomExerciseFormError.sets,
+                  ),
+                  _CustomExerciseErrorText(
+                    current: state.customExerciseFormError,
+                    target: CustomExerciseFormError.rest,
+                  ),
+                  const SizedBox(height: 10),
+                  _CustomExerciseDropdown<CustomExerciseTargetType>(
+                    keyName: 'training_custom_exercise_target_type_dropdown',
+                    labelText: '측정 방식',
+                    value: form.targetType,
+                    values: CustomExerciseTargetType.values,
+                    displayName: (value) => value.displayName,
+                    optionKey: (value) =>
+                        'training_custom_exercise_target_type_option_${value.name}',
+                    onChanged: controller.updateCustomExerciseTargetType,
+                  ),
+                  const SizedBox(height: 10),
+                  if (form.targetType == CustomExerciseTargetType.reps)
+                    Row(
+                      children: <Widget>[
+                        Expanded(
+                          child: TextFormField(
+                            key: const Key(
+                              'training_custom_exercise_rep_first_input',
+                            ),
+                            initialValue: form.repRangeFirst,
+                            decoration: const InputDecoration(
+                              labelText: '최소 반복',
+                              border: OutlineInputBorder(),
+                            ),
+                            keyboardType: TextInputType.number,
+                            onChanged:
+                                controller.updateCustomExerciseRepRangeFirst,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: TextFormField(
+                            key: const Key(
+                              'training_custom_exercise_rep_last_input',
+                            ),
+                            initialValue: form.repRangeLast,
+                            decoration: const InputDecoration(
+                              labelText: '최대 반복',
+                              border: OutlineInputBorder(),
+                            ),
+                            keyboardType: TextInputType.number,
+                            onChanged:
+                                controller.updateCustomExerciseRepRangeLast,
+                          ),
+                        ),
+                      ],
+                    )
+                  else
+                    TextFormField(
+                      key: const Key(
+                        'training_custom_exercise_duration_minutes_input',
+                      ),
+                      initialValue: form.durationMinutes,
+                      decoration: const InputDecoration(
+                        labelText: '시간(분)',
+                        border: OutlineInputBorder(),
+                      ),
+                      keyboardType: TextInputType.number,
+                      onChanged: controller.updateCustomExerciseDurationMinutes,
+                    ),
+                  _CustomExerciseErrorText(
+                    current: state.customExerciseFormError,
+                    target: form.targetType == CustomExerciseTargetType.reps
+                        ? CustomExerciseFormError.reps
+                        : CustomExerciseFormError.duration,
+                  ),
+                  if (state.customExerciseFormError ==
+                      CustomExerciseFormError.saveFailed) ...<Widget>[
+                    const SizedBox(height: 10),
+                    const Text(
+                      '운동을 저장하지 못했습니다.',
+                      style: TextStyle(color: Colors.red),
+                    ),
+                  ],
+                  const SizedBox(height: 14),
+                  FilledButton.icon(
+                    key: const Key('training_custom_exercise_save_button'),
+                    onPressed: controller.saveCustomExercise,
+                    icon: const Icon(Icons.check),
+                    label: const Text('저장'),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _OwnerContext extends StatelessWidget {
+  const _OwnerContext();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: const Key('training_custom_exercise_owner_context'),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: SmartTrainnerColors.coralSoft,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: const Row(
+        children: <Widget>[
+          Icon(Icons.lock_outline, color: SmartTrainnerColors.coral),
+          SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              '소유자: 나 · 공개 범위: 비공개',
+              key: Key('training_custom_exercise_visibility_private'),
+              style: TextStyle(fontWeight: FontWeight.w800),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CustomExerciseImagePreview extends StatelessWidget {
+  const _CustomExerciseImagePreview({required this.imagePath});
+
+  final String imagePath;
+
+  @override
+  Widget build(BuildContext context) {
+    final path = imagePath.trim();
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        key: const Key('training_custom_exercise_image_preview'),
+        height: 132,
+        color: SmartTrainnerColors.coralSoft,
+        child: path.isEmpty
+            ? const _CustomExerciseImagePlaceholder()
+            : Image.file(
+                File(path),
+                fit: BoxFit.cover,
+                width: double.infinity,
+                errorBuilder: (context, error, stackTrace) {
+                  return const _CustomExerciseImagePlaceholder();
+                },
+              ),
+      ),
+    );
+  }
+}
+
+class _CustomExerciseImagePlaceholder extends StatelessWidget {
+  const _CustomExerciseImagePlaceholder();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Center(
+      child: Icon(
+        Icons.fitness_center,
+        key: Key('training_custom_exercise_image_placeholder'),
+        color: SmartTrainnerColors.coral,
+      ),
+    );
+  }
+}
+
+class _CustomExerciseDropdown<T> extends StatelessWidget {
+  const _CustomExerciseDropdown({
+    required this.keyName,
+    required this.labelText,
+    required this.value,
+    required this.values,
+    required this.displayName,
+    required this.optionKey,
+    required this.onChanged,
+  });
+
+  final String keyName;
+  final String labelText;
+  final T? value;
+  final List<T> values;
+  final String Function(T value) displayName;
+  final String Function(T value) optionKey;
+  final ValueChanged<T> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return DropdownButtonFormField<T>(
+      key: Key(keyName),
+      initialValue: value,
+      decoration: InputDecoration(
+        labelText: labelText,
+        border: const OutlineInputBorder(),
+      ),
+      items: values.map((value) {
+        return DropdownMenuItem<T>(
+          value: value,
+          child: Text(displayName(value), key: Key(optionKey(value))),
+        );
+      }).toList(),
+      onChanged: (value) {
+        if (value != null) {
+          onChanged(value);
+        }
+      },
+    );
+  }
+}
+
+class _CustomExerciseErrorText extends StatelessWidget {
+  const _CustomExerciseErrorText({required this.current, required this.target});
+
+  final CustomExerciseFormError? current;
+  final CustomExerciseFormError target;
+
+  @override
+  Widget build(BuildContext context) {
+    if (current != target) {
+      return const SizedBox.shrink();
+    }
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Text(
+        _customExerciseFormErrorText(target),
+        key: Key('training_custom_exercise_error_${target.name}'),
+        style: const TextStyle(color: Colors.red),
+      ),
     );
   }
 }
@@ -827,6 +1365,7 @@ class _ExerciseRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isOwned = exercise.metadata.isOwnedLibraryItem;
     return Material(
       color: Colors.white,
       borderRadius: BorderRadius.circular(8),
@@ -848,8 +1387,13 @@ class _ExerciseRow extends StatelessWidget {
                       exercise.name,
                       style: const TextStyle(fontWeight: FontWeight.w900),
                     ),
+                    if (isOwned) ...<Widget>[
+                      const SizedBox(height: 4),
+                      const _SourceBadge(label: '내 운동'),
+                    ],
                     const SizedBox(height: 3),
                     Text(
+                      '${isOwned ? '내 운동 · ' : ''}'
                       '${exercise.equipment.displayName} · ${exercise.targetText}',
                       style: const TextStyle(color: SmartTrainnerColors.muted),
                     ),
@@ -865,6 +1409,32 @@ class _ExerciseRow extends StatelessWidget {
   }
 }
 
+class _SourceBadge extends StatelessWidget {
+  const _SourceBadge({required this.label, super.key});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: SmartTrainnerColors.coralSoft,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        child: Text(
+          label,
+          style: const TextStyle(
+            color: SmartTrainnerColors.coral,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _ExerciseThumb extends StatelessWidget {
   const _ExerciseThumb({required this.exercise});
 
@@ -873,24 +1443,46 @@ class _ExerciseThumb extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final assetPath = exerciseThumbnailAssetPath(exercise.id.value);
+    final imagePath = exercise.imagePath;
     return ClipRRect(
       borderRadius: BorderRadius.circular(8),
       child: Container(
+        key: Key('training_exercise_thumb_${exercise.id.value}'),
         width: 58,
         height: 58,
         color: SmartTrainnerColors.coralSoft,
-        child: assetPath == null
-            ? Center(
-                child: Text(
-                  exercise.name.isEmpty ? '?' : exercise.name.substring(0, 1),
-                  style: const TextStyle(fontWeight: FontWeight.w900),
-                ),
+        child: imagePath != null && imagePath.trim().isNotEmpty
+            ? Image.file(
+                File(imagePath),
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  return _ExerciseThumbPlaceholder(exercise: exercise);
+                },
               )
+            : assetPath == null
+            ? _ExerciseThumbPlaceholder(exercise: exercise)
             : Image.asset(
                 assetPath,
                 package: 'smart_trainner_feature_training_impl',
                 fit: BoxFit.cover,
               ),
+      ),
+    );
+  }
+}
+
+class _ExerciseThumbPlaceholder extends StatelessWidget {
+  const _ExerciseThumbPlaceholder({required this.exercise});
+
+  final Exercise exercise;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      key: Key('training_exercise_thumb_placeholder_${exercise.id.value}'),
+      child: Text(
+        exercise.name.isEmpty ? '?' : exercise.name.substring(0, 1),
+        style: const TextStyle(fontWeight: FontWeight.w900),
       ),
     );
   }
@@ -1302,6 +1894,23 @@ String _formErrorText(RecordFormError error) {
     RecordFormError.weight => '무게는 0kg 이상으로 입력해 주세요.',
     RecordFormError.duration => '시간은 1분 이상 240분 이하로 입력해 주세요.',
     RecordFormError.saveFailed => '기록 저장에 실패했습니다.',
+  };
+}
+
+String _customExerciseFormErrorText(CustomExerciseFormError error) {
+  return switch (error) {
+    CustomExerciseFormError.name => '운동 이름을 입력해 주세요.',
+    CustomExerciseFormError.muscleGroup => '카테고리를 선택해 주세요.',
+    CustomExerciseFormError.equipment => '장비를 선택해 주세요.',
+    CustomExerciseFormError.difficulty => '난이도를 선택해 주세요.',
+    CustomExerciseFormError.summary => '기본 설명을 입력해 주세요.',
+    CustomExerciseFormError.instructions => '운동 방법을 한 줄 이상 입력해 주세요.',
+    CustomExerciseFormError.safetyCues => '주의 포인트를 한 줄 이상 입력해 주세요.',
+    CustomExerciseFormError.sets => '세트는 1개 이상 12개 이하로 입력해 주세요.',
+    CustomExerciseFormError.reps => '반복 범위는 1회 이상 50회 이하로 입력해 주세요.',
+    CustomExerciseFormError.duration => '시간은 1분 이상 240분 이하로 입력해 주세요.',
+    CustomExerciseFormError.rest => '휴식은 15초 이상 600초 이하로 입력해 주세요.',
+    CustomExerciseFormError.saveFailed => '운동 저장에 실패했습니다.',
   };
 }
 

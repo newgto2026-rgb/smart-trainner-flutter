@@ -9,6 +9,7 @@ import 'package:smart_trainner_core_model/smart_trainner_core_model.dart';
 
 class DefaultTrainingRepository implements TrainingRepository {
   DefaultTrainingRepository({
+    required this.customExerciseDao,
     required this.workoutLogDao,
     required this.preferences,
     required this.summaryCalculator,
@@ -18,6 +19,7 @@ class DefaultTrainingRepository implements TrainingRepository {
        },
        _templates = SeedTrainingContent.templates;
 
+  final CustomExerciseDao customExerciseDao;
   final WorkoutLogDao workoutLogDao;
   final TrainingPreferencesDataSource preferences;
   final WeeklySummaryCalculator summaryCalculator;
@@ -26,7 +28,9 @@ class DefaultTrainingRepository implements TrainingRepository {
 
   @override
   Stream<List<Exercise>> observeExercises() {
-    return Stream.value(SeedTrainingContent.exercises);
+    return customExerciseDao.observeAll().map((customExercises) {
+      return _exerciseCatalogFor(_activeOwnerUserId(), customExercises);
+    });
   }
 
   @override
@@ -75,7 +79,46 @@ class DefaultTrainingRepository implements TrainingRepository {
 
   @override
   Future<Exercise?> getExercise(ExerciseId id) async {
-    return _exerciseById[id];
+    final seedExercise = _exerciseById[id];
+    if (seedExercise != null) {
+      return seedExercise;
+    }
+    final ownerUserId = _activeOwnerUserId();
+    final customExercises = await customExerciseDao
+        .observeByOwner(ownerUserId)
+        .first;
+    return customExercises
+        .where((exercise) => exercise.id == id.value)
+        .firstOrNull
+        ?.toModel();
+  }
+
+  @override
+  Future<OperationResult<Exercise>> createCustomExercise(
+    CustomExerciseInput input,
+  ) async {
+    try {
+      _validateCustomExercise(input);
+      final ownerUserId = _activeOwnerUserId();
+      final existing = await customExerciseDao
+          .observeByOwner(ownerUserId)
+          .first;
+      final id = _nextCustomExerciseId(
+        ownerUserId: ownerUserId,
+        name: input.name,
+        existingIds: existing.map((exercise) => exercise.id).toSet(),
+      );
+      final timestamp = DateTime.now().toIso8601String();
+      final entity = input.toEntity(
+        id: id,
+        ownerUserId: ownerUserId,
+        timestamp: timestamp,
+      );
+      await customExerciseDao.upsert(entity);
+      return OperationResult.success(entity.toModel());
+    } catch (error) {
+      return OperationResult.failure(error);
+    }
   }
 
   @override
@@ -149,6 +192,8 @@ class DefaultTrainingRepository implements TrainingRepository {
   String _activeSessionId() =>
       preferences.activeSessionIdValue ?? defaultUserSessionId;
 
+  String _activeOwnerUserId() => _activeSessionId();
+
   WeeklyPlan _buildWeeklyPlan({
     required PlanTemplate template,
     required DateTime weekStartDate,
@@ -181,6 +226,103 @@ class DefaultTrainingRepository implements TrainingRepository {
       }).toList(),
     );
   }
+
+  List<Exercise> _exerciseCatalogFor(
+    String ownerUserId,
+    List<CustomExerciseEntity> customExercises,
+  ) {
+    return <Exercise>[
+      ...SeedTrainingContent.exercises,
+      ...customExercises
+          .where((exercise) => exercise.ownerUserId == ownerUserId)
+          .map((exercise) => exercise.toModel()),
+    ];
+  }
+}
+
+void _validateCustomExercise(CustomExerciseInput input) {
+  if (input.name.trim().isEmpty) {
+    throw ArgumentError('Custom exercise name is required.');
+  }
+  if (input.summary.trim().isEmpty) {
+    throw ArgumentError('Custom exercise summary is required.');
+  }
+  if (input.instructions.isEmpty ||
+      input.instructions.any((instruction) => instruction.trim().isEmpty)) {
+    throw ArgumentError('Custom exercise instructions are required.');
+  }
+  if (input.safetyCues.isEmpty ||
+      input.safetyCues.any((cue) => cue.trim().isEmpty)) {
+    throw ArgumentError('Custom exercise safety cues are required.');
+  }
+  if (input.defaultSets < 1 || input.defaultSets > 12) {
+    throw ArgumentError('Default sets must be between 1 and 12.');
+  }
+  final repRange = input.defaultRepRange;
+  if (repRange == null && input.defaultDurationMinutes == null) {
+    throw ArgumentError('Custom exercise needs reps or duration.');
+  }
+  if (repRange != null &&
+      (repRange.first < 1 ||
+          repRange.last > 50 ||
+          repRange.first > repRange.last)) {
+    throw ArgumentError('Rep range must be between 1 and 50.');
+  }
+  final duration = input.defaultDurationMinutes;
+  if (duration != null && (duration < 1 || duration > 240)) {
+    throw ArgumentError('Duration must be between 1 and 240 minutes.');
+  }
+  if (input.restSeconds < 15 || input.restSeconds > 600) {
+    throw ArgumentError('Rest seconds must be between 15 and 600.');
+  }
+}
+
+ExerciseId _nextCustomExerciseId({
+  required String ownerUserId,
+  required String name,
+  required Set<String> existingIds,
+}) {
+  final ownerSlug = _slugify(ownerUserId);
+  final nameSlug = _slugify(name);
+  final base =
+      'custom_${ownerSlug.isEmpty ? 'user' : ownerSlug}_'
+      '${nameSlug.isEmpty ? 'exercise' : nameSlug}';
+  var candidate = base;
+  var suffix = 2;
+  while (existingIds.contains(candidate)) {
+    candidate = '${base}_$suffix';
+    suffix++;
+  }
+  return ExerciseId(candidate);
+}
+
+String _slugify(String value) {
+  final lower = value.toLowerCase();
+  final buffer = StringBuffer();
+  var previousDash = false;
+  for (final codeUnit in lower.codeUnits) {
+    final isDigit = codeUnit >= 48 && codeUnit <= 57;
+    final isLowerAlpha = codeUnit >= 97 && codeUnit <= 122;
+    if (isDigit || isLowerAlpha) {
+      buffer.writeCharCode(codeUnit);
+      previousDash = false;
+    } else if (!previousDash && buffer.isNotEmpty) {
+      buffer.write('_');
+      previousDash = true;
+    }
+    if (buffer.length >= 32) {
+      break;
+    }
+  }
+  var result = buffer.toString();
+  while (result.endsWith('_')) {
+    result = result.substring(0, result.length - 1);
+  }
+  return result;
+}
+
+extension _IterableFirstOrNull<T> on Iterable<T> {
+  T? get firstOrNull => isEmpty ? null : first;
 }
 
 Stream<R> combineLatest2<A, B, R>(

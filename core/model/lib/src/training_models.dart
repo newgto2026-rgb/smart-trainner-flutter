@@ -137,6 +137,60 @@ enum PlanLevel {
   final String displayName;
 }
 
+enum ExerciseSource {
+  seed('기본'),
+  userCreated('내 운동'),
+  importedCopy('가져옴'),
+  sharedReference('공유됨');
+
+  const ExerciseSource(this.displayName);
+
+  final String displayName;
+}
+
+class ExerciseSourceMetadata {
+  const ExerciseSourceMetadata({
+    required this.source,
+    required this.ownerUserId,
+    required this.originExerciseId,
+    required this.sourceOwnerUserId,
+    required this.sourceShareId,
+  });
+
+  const ExerciseSourceMetadata.seed()
+    : source = ExerciseSource.seed,
+      ownerUserId = null,
+      originExerciseId = null,
+      sourceOwnerUserId = null,
+      sourceShareId = null;
+
+  const ExerciseSourceMetadata.userCreated({required this.ownerUserId})
+    : source = ExerciseSource.userCreated,
+      originExerciseId = null,
+      sourceOwnerUserId = null,
+      sourceShareId = null;
+
+  final ExerciseSource source;
+  final String? ownerUserId;
+  final ExerciseId? originExerciseId;
+  final String? sourceOwnerUserId;
+  final String? sourceShareId;
+
+  bool get isSeed => source == ExerciseSource.seed;
+  bool get isOwnedLibraryItem =>
+      source == ExerciseSource.userCreated ||
+      source == ExerciseSource.importedCopy;
+}
+
+enum CustomExerciseTargetType {
+  reps('반복'),
+  duration('시간');
+
+  const CustomExerciseTargetType(this.displayName);
+
+  final String displayName;
+}
+
 class RepRange {
   const RepRange(this.first, this.last);
 
@@ -166,6 +220,8 @@ class Exercise {
     required this.defaultRepRange,
     required this.defaultDurationMinutes,
     required this.restSeconds,
+    this.imagePath,
+    this.metadata = const ExerciseSourceMetadata.seed(),
   });
 
   final ExerciseId id;
@@ -174,6 +230,7 @@ class Exercise {
   final EquipmentType equipment;
   final DifficultyLevel difficulty;
   final String imageKey;
+  final String? imagePath;
   final String summary;
   final List<String> instructions;
   final List<String> safetyCues;
@@ -181,6 +238,7 @@ class Exercise {
   final RepRange? defaultRepRange;
   final int? defaultDurationMinutes;
   final int restSeconds;
+  final ExerciseSourceMetadata metadata;
 
   String get targetText {
     final repRange = defaultRepRange;
@@ -189,6 +247,36 @@ class Exercise {
     }
     return '$defaultSets세트 x ${defaultDurationMinutes ?? 10}분';
   }
+}
+
+class CustomExerciseInput {
+  const CustomExerciseInput({
+    required this.name,
+    required this.muscleGroup,
+    required this.equipment,
+    required this.difficulty,
+    required this.summary,
+    required this.instructions,
+    required this.safetyCues,
+    required this.defaultSets,
+    required this.defaultRepRange,
+    required this.defaultDurationMinutes,
+    required this.restSeconds,
+    required this.imagePath,
+  });
+
+  final String name;
+  final MuscleGroup muscleGroup;
+  final EquipmentType equipment;
+  final DifficultyLevel difficulty;
+  final String summary;
+  final List<String> instructions;
+  final List<String> safetyCues;
+  final int defaultSets;
+  final RepRange? defaultRepRange;
+  final int? defaultDurationMinutes;
+  final int restSeconds;
+  final String? imagePath;
 }
 
 class PlanTemplate {

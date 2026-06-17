@@ -10,6 +10,7 @@ class TrainingFeatureEntryImpl implements TrainingFeatureEntry {
     required this.observeCurrentWeeklyPlan,
     required this.observeWorkoutLogs,
     required this.observeWeeklySummary,
+    required this.createCustomExercise,
     required this.selectPlanTemplate,
     required this.saveWorkoutLog,
   });
@@ -19,6 +20,7 @@ class TrainingFeatureEntryImpl implements TrainingFeatureEntry {
   final ObserveCurrentWeeklyPlanUseCase observeCurrentWeeklyPlan;
   final ObserveWorkoutLogsUseCase observeWorkoutLogs;
   final ObserveWeeklySummaryUseCase observeWeeklySummary;
+  final CreateCustomExerciseUseCase createCustomExercise;
   final SelectPlanTemplateUseCase selectPlanTemplate;
   final SaveWorkoutLogUseCase saveWorkoutLog;
 
@@ -30,6 +32,7 @@ class TrainingFeatureEntryImpl implements TrainingFeatureEntry {
       observeCurrentWeeklyPlan: observeCurrentWeeklyPlan,
       observeWorkoutLogs: observeWorkoutLogs,
       observeWeeklySummary: observeWeeklySummary,
+      createCustomExercise: createCustomExercise,
       selectPlanTemplate: selectPlanTemplate,
       saveWorkoutLog: saveWorkoutLog,
     );
