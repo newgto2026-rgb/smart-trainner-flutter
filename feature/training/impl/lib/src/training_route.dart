@@ -862,24 +862,27 @@ class _CustomExerciseDropdown<T> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DropdownButtonFormField<T>(
+    return SizedBox(
       key: Key(keyName),
-      initialValue: value,
-      decoration: InputDecoration(
-        labelText: labelText,
-        border: const OutlineInputBorder(),
+      child: DropdownButtonFormField<T>(
+        key: ValueKey<String>('$keyName:${value ?? 'none'}'),
+        initialValue: value,
+        decoration: InputDecoration(
+          labelText: labelText,
+          border: const OutlineInputBorder(),
+        ),
+        items: values.map((value) {
+          return DropdownMenuItem<T>(
+            value: value,
+            child: Text(displayName(value), key: Key(optionKey(value))),
+          );
+        }).toList(),
+        onChanged: (value) {
+          if (value != null) {
+            onChanged(value);
+          }
+        },
       ),
-      items: values.map((value) {
-        return DropdownMenuItem<T>(
-          value: value,
-          child: Text(displayName(value), key: Key(optionKey(value))),
-        );
-      }).toList(),
-      onChanged: (value) {
-        if (value != null) {
-          onChanged(value);
-        }
-      },
     );
   }
 }

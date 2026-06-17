@@ -84,13 +84,11 @@ class DefaultTrainingRepository implements TrainingRepository {
       return seedExercise;
     }
     final ownerUserId = _activeOwnerUserId();
-    final customExercises = await customExerciseDao
-        .observeByOwner(ownerUserId)
-        .first;
-    return customExercises
-        .where((exercise) => exercise.id == id.value)
-        .firstOrNull
-        ?.toModel();
+    final entity = await customExerciseDao.getById(id.value);
+    if (entity != null && entity.ownerUserId == ownerUserId) {
+      return entity.toModel();
+    }
+    return null;
   }
 
   @override
@@ -108,7 +106,7 @@ class DefaultTrainingRepository implements TrainingRepository {
         name: input.name,
         existingIds: existing.map((exercise) => exercise.id).toSet(),
       );
-      final timestamp = DateTime.now().toIso8601String();
+      final timestamp = DateTime.now().toUtc().toIso8601String();
       final entity = input.toEntity(
         id: id,
         ownerUserId: ownerUserId,
@@ -319,10 +317,6 @@ String _slugify(String value) {
     result = result.substring(0, result.length - 1);
   }
   return result;
-}
-
-extension _IterableFirstOrNull<T> on Iterable<T> {
-  T? get firstOrNull => isEmpty ? null : first;
 }
 
 Stream<R> combineLatest2<A, B, R>(

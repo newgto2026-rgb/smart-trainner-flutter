@@ -37,6 +37,16 @@ void main() {
       ]);
     },
   );
+
+  test('getById returns one custom exercise without owner filtering', () async {
+    await dao.upsert(_entity(id: 'custom_a_hinge', ownerUserId: 'user-a'));
+    await dao.upsert(_entity(id: 'custom_b_hinge', ownerUserId: 'user-b'));
+
+    final result = await dao.getById('custom_b_hinge');
+
+    expect(result, isNotNull);
+    expect(result?.ownerUserId, 'user-b');
+  });
 }
 
 CustomExerciseEntity _entity({

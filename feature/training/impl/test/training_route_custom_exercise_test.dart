@@ -38,9 +38,10 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.enterText(
-      find.byKey(const Key('training_custom_exercise_name_input')),
-      'Custom Hinge',
+    await _enterCustomFormText(
+      tester,
+      key: 'training_custom_exercise_name_input',
+      text: 'Custom Hinge',
     );
     await _selectDropdown(
       tester,
@@ -57,17 +58,20 @@ void main() {
       dropdownKey: 'training_custom_exercise_difficulty_dropdown',
       optionKey: 'training_custom_exercise_difficulty_option_beginner',
     );
-    await tester.enterText(
-      find.byKey(const Key('training_custom_exercise_summary_input')),
-      'A custom posterior-chain movement.',
+    await _enterCustomFormText(
+      tester,
+      key: 'training_custom_exercise_summary_input',
+      text: 'A custom posterior-chain movement.',
     );
-    await tester.enterText(
-      find.byKey(const Key('training_custom_exercise_instructions_input')),
-      'Hinge at the hips.\nStand tall.',
+    await _enterCustomFormText(
+      tester,
+      key: 'training_custom_exercise_instructions_input',
+      text: 'Hinge at the hips.\nStand tall.',
     );
-    await tester.enterText(
-      find.byKey(const Key('training_custom_exercise_safety_input')),
-      'Keep the spine neutral.',
+    await _enterCustomFormText(
+      tester,
+      key: 'training_custom_exercise_safety_input',
+      text: 'Keep the spine neutral.',
     );
 
     await _scrollUntilVisible(tester, 'training_custom_exercise_save_button');
@@ -151,6 +155,16 @@ Future<void> _selectDropdown(
   await tester.tap(find.byKey(Key(dropdownKey)));
   await tester.pumpAndSettle();
   await tester.tap(find.byKey(Key(optionKey)).last);
+  await tester.pumpAndSettle();
+}
+
+Future<void> _enterCustomFormText(
+  WidgetTester tester, {
+  required String key,
+  required String text,
+}) async {
+  await _scrollUntilVisible(tester, key);
+  await tester.enterText(find.byKey(Key(key)), text);
   await tester.pumpAndSettle();
 }
 

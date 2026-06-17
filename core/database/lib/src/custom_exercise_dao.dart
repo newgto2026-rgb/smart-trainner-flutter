@@ -7,6 +7,8 @@ abstract interface class CustomExerciseDao {
 
   Stream<List<CustomExerciseEntity>> observeByOwner(String ownerUserId);
 
+  Future<CustomExerciseEntity?> getById(String id);
+
   Future<void> upsert(CustomExerciseEntity exercise);
 }
 
@@ -15,19 +17,57 @@ class InMemoryCustomExerciseDao implements CustomExerciseDao {
   final _exercises = <CustomExerciseEntity>[];
 
   @override
-  Stream<List<CustomExerciseEntity>> observeAll() async* {
-    yield _queryAll();
-    await for (final _ in _changes.stream) {
-      yield _queryAll();
-    }
+  Stream<List<CustomExerciseEntity>> observeAll() {
+    late final StreamController<List<CustomExerciseEntity>> controller;
+    StreamSubscription<void>? subscription;
+
+    controller = StreamController<List<CustomExerciseEntity>>.broadcast(
+      onListen: () {
+        controller.add(_queryAll());
+        subscription = _changes.stream.listen((_) {
+          if (!controller.isClosed) {
+            controller.add(_queryAll());
+          }
+        });
+      },
+      onCancel: () async {
+        await subscription?.cancel();
+      },
+    );
+
+    return controller.stream;
   }
 
   @override
-  Stream<List<CustomExerciseEntity>> observeByOwner(String ownerUserId) async* {
-    yield _queryByOwner(ownerUserId);
-    await for (final _ in _changes.stream) {
-      yield _queryByOwner(ownerUserId);
+  Stream<List<CustomExerciseEntity>> observeByOwner(String ownerUserId) {
+    late final StreamController<List<CustomExerciseEntity>> controller;
+    StreamSubscription<void>? subscription;
+
+    controller = StreamController<List<CustomExerciseEntity>>.broadcast(
+      onListen: () {
+        controller.add(_queryByOwner(ownerUserId));
+        subscription = _changes.stream.listen((_) {
+          if (!controller.isClosed) {
+            controller.add(_queryByOwner(ownerUserId));
+          }
+        });
+      },
+      onCancel: () async {
+        await subscription?.cancel();
+      },
+    );
+
+    return controller.stream;
+  }
+
+  @override
+  Future<CustomExerciseEntity?> getById(String id) async {
+    for (final exercise in _exercises) {
+      if (exercise.id == id) {
+        return exercise;
+      }
     }
+    return null;
   }
 
   @override
