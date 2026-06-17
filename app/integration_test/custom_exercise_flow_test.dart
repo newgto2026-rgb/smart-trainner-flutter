@@ -71,8 +71,11 @@ Future<void> _enterTextInCustomForm(
   String key,
   String text,
 ) async {
-  await _scrollUntilVisible(tester, key);
-  await tester.enterText(find.byKey(Key(key)), text);
+  final finder = await _scrollUntilVisible(tester, key);
+  await tester.tap(finder.hitTestable());
+  await tester.pumpAndSettle();
+  tester.testTextInput.enterText(text);
+  await tester.testTextInput.receiveAction(TextInputAction.done);
   await tester.pumpAndSettle();
 }
 
@@ -81,16 +84,20 @@ Future<void> _selectDropdown(
   required String dropdownKey,
   required String optionKey,
 }) async {
-  await _scrollUntilVisible(tester, dropdownKey);
-  await tester.tap(find.byKey(Key(dropdownKey)));
+  final dropdown = await _scrollUntilVisible(tester, dropdownKey);
+  await tester.tap(dropdown.hitTestable());
   await tester.pumpAndSettle();
   await tester.tap(find.byKey(Key(optionKey)).last);
   await tester.pumpAndSettle();
 }
 
-Future<void> _scrollUntilVisible(WidgetTester tester, String key) async {
+Future<Finder> _scrollUntilVisible(WidgetTester tester, String key) async {
   final finder = find.byKey(Key(key));
-  for (var attempt = 0; attempt < 12 && finder.evaluate().isEmpty; attempt++) {
+  for (
+    var attempt = 0;
+    attempt < 16 && finder.hitTestable().evaluate().isEmpty;
+    attempt++
+  ) {
     await tester.drag(
       find.byKey(const Key('training_custom_exercise_form_scroll')),
       const Offset(0, -320),
@@ -101,4 +108,6 @@ Future<void> _scrollUntilVisible(WidgetTester tester, String key) async {
   expect(finder, findsOneWidget);
   await tester.ensureVisible(finder);
   await tester.pumpAndSettle();
+  expect(finder.hitTestable(), findsOneWidget);
+  return finder;
 }
